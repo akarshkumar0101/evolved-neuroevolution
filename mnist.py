@@ -4,6 +4,7 @@ import torchvision
 
 from tqdm import tqdm
 
+# batch_size_train = 1000
 batch_size_train = 64
 batch_size_test = 3000
 transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
