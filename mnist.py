@@ -4,14 +4,14 @@ import torchvision
 
 from tqdm import tqdm
 
-# batch_size_train = 1000
-batch_size_train = 64
+batch_size_train = 1000
+# batch_size_train = 64
 batch_size_test = 3000
 transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
                                             torchvision.transforms.Normalize((0.1307,), (0.3081,))])
 
 train_loader = torch.utils.data.DataLoader(
-  torchvision.datasets.MNIST('./mnist/', train=True, download=True,
+  torchvision.datasets.MNIST('./', train=True, download=True,
                              transform=transform),
   batch_size=batch_size_train, shuffle=True)
 
@@ -22,7 +22,7 @@ test_loader = torch.utils.data.DataLoader(
 
 loss_func = nn.NLLLoss()
 
-def perform_stats(net, loader=test_loader, show_stats=True, n_batches=-1, tqdm=tqdm):
+def perform_stats(net, loader=test_loader, show_stats=True, n_batches=-1, tqdm=tqdm, device='cpu'):
     n_correct, total = 0, 0
     loss_total = 0
     n_examples = 0
@@ -30,6 +30,7 @@ def perform_stats(net, loader=test_loader, show_stats=True, n_batches=-1, tqdm=t
     if tqdm is not None:
         loop = tqdm(loop, leave=False, total=max(n_batches, len(loader)))
     for batch_idx, (X_batch, Y_batch) in loop:
+        X_batch, Y_batch = X_batch.to(device), Y_batch.to(device)
         if batch_idx == n_batches:
             break
         Y_batch_pred = net(X_batch)
