@@ -48,5 +48,6 @@ class SmallNet(nn.Module):
         x = torch.relu(torch.max_pool2d(self.conv2(x), 2))
         x = torch.relu(self.conv3(x))
         x = x.view(-1, 9)
+        y = x
         x = self.fc1(x)
-        return x.softmax(dim=-1)
+        return x.softmax(dim=-1)#, y, x
