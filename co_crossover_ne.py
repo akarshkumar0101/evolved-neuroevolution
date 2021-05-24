@@ -2,14 +2,16 @@ import numpy as np
 import torch
 from torch import nn
 
-class Agent():
-    def __init__(self, geno=None, decoder_geno=None):
-        self.geno = geno
-        self.decoder_geno = decoder_geno
+import util
+
+class Genotype():
+    def __init__(self, dna=None, decoder_dna=None):
+        self.dna = dna
+        self.decoder_dna = decoder_dna
         
-class CrossoverAgent():
-    def __init__(self, co_geno=None):
-        self.co_geno = co_geno
+class CrossoverGenotype():
+    def __init__(self, co_dna=None):
+        self.co_dna = co_dna
 
 class COCrossoverNE:
     def __init__(self, model, comodel, fitness_func, config, device='cpu'):
@@ -21,141 +23,140 @@ class COCrossoverNE:
         self.device = device
         self.N = config['n_pop']
         self.co_N = config['n_pop']
+        self.n_parents = self.N-self.config['n_elite']
+        self.co_n_parents = self.co_N-self.config['n_elite']
         
         self.dim = len(nn.utils.parameters_to_vector(self.model().parameters()).detach())
         self.co_dim = len(nn.utils.parameters_to_vector(self.comodel().parameters()).detach())
         
     def geno2pheno(self, geno, pheno):
-        nn.utils.vector_to_parameters(geno.geno, pheno.parameters())
+        nn.utils.vector_to_parameters(geno.dna, pheno.parameters())
         return pheno
 
     def set_init_population(self):
-        pop = np.empty(self.N, dtype=object)
-        co_pop = np.empty(self.co_N, dtype=object)
+        pop, co_pop = [], []
         for i in range(self.N):
-            geno = nn.utils.parameters_to_vector(self.model().parameters()).detach().to(self.device)
-            pop[i] = Agent(geno)
+            dna = nn.utils.parameters_to_vector(self.model().parameters()).detach().to(self.device)
+            pop.append(Genotype(dna, None))
         for i in range(self.co_N):
-            co_geno = nn.utils.parameters_to_vector(self.comodel().parameters()).detach().to(self.device)
-            co_pop[i] = CrossoverAgent(co_geno)
-        self.npop = pop
-        self.co_npop = co_pop
+            co_dna = nn.utils.parameters_to_vector(self.comodel().parameters()).detach().to(self.device)
+            co_pop.append(CrossoverGenotype(co_dna))
+        self.npop = util.to_np_obj_array(pop)
+        self.co_npop = util.to_np_obj_array(co_pop)
 
-    def calc_fitnesses_and_sort(self):
+    def calc_fitnesses_of_pop(self, pop, sort=True):
         agent = self.model().to(self.device)
-        self.fitdata = {}
-        for geno in self.pop:
+        fitdata = {}
+        for geno in pop:
             agent = self.geno2pheno(geno, pheno=agent)
             fitdata_i = self.fitness_func(agent)
             for key in fitdata_i.keys():
-                if key not in self.fitdata.keys():
-                    self.fitdata[key] = []
-                self.fitdata[key].append(fitdata_i[key])
+                if key not in fitdata.keys():
+                    fitdata[key] = []
+                fitdata[key].append(fitdata_i[key])
         
-        fit_idx = np.argsort(self.fitdata['fitness'])
-        self.pop = self.pop[fit_idx]
-        for key in self.fitdata.keys():
-            self.fitdata[key] = np.array(self.fitdata[key])[fit_idx]
-        self.fitnesses = self.fitdata['fitness']
+        fit_idx = np.arange(len(pop))
+        if sort:
+            fit_idx = np.argsort(fitdata['fitness'])
+            
+        pop = pop[fit_idx]
+        for key in fitdata.keys():
+            fitdata[key] = np.array(fitdata[key])[fit_idx]
+        fitnesses = fitdata['fitness']
+        return pop, fitnesses, fitdata
+        
+    def calc_fitnesses_and_sort(self):
+        self.pop, self.fitnesses, self.fitdata = self.calc_fitnesses_of_pop(self.pop, sort=True)
     
     def calc_co_fitnesses_and_sort(self):
         co_agent = self.comodel().to(self.device)
-        self.fitdata = {}
+        self.co_fitnesses = []
         for co_geno in self.co_pop:
-            agent = self.geno2pheno(geno, pheno=agent)
-            fitdata_i = self.fitness_func(agent)
-            for key in fitdata_i.keys():
-                if key not in self.fitdata.keys():
-                    self.fitdata[key] = []
-                self.fitdata[key].append(fitdata_i[key])
+            nn.utils.vector_to_parameters(co_geno.co_dna, co_agent.parameters())
+            
+            n_children = 10
+            parents1 = np.random.choice(self.pop, size=n_children, p=self.prob, replace=self.config['with_replacement'])
+            parents2 = np.random.choice(self.pop, size=n_children, p=self.prob, replace=self.config['with_replacement'])
+            co_pop_for_parents = util.to_np_obj_array([co_geno for _ in range(n_children)])
+            children = self.calc_crossover(parents1, parents2, co_pop_for_parents)
+
+            children, child_fitness, child_fitdata = self.calc_fitnesses_of_pop(children)
+            co_fitness = child_fitness.mean()
+            self.co_fitnesses.append(co_fitness)
         
-        fit_idx = np.argsort(self.fitdata['fitness'])
-        self.pop = self.pop[fit_idx]
-        for key in self.fitdata.keys():
-            self.fitdata[key] = np.array(self.fitdata[key])[fit_idx]
-        self.fitnesses = self.fitdata['fitness']
+        fit_idx = np.argsort(self.co_fitnesses)
+        self.co_pop = self.co_pop[fit_idx]
+        self.co_fitnesses = np.array(self.co_fitnesses)[fit_idx]
         
     def calc_mutate(self, pop):
         mutant = []
-        for p in pop:
-            pm = p.geno.clone()
-            pm = pm + self.config['mutate_lr']*torch.randn_like(pm) # all small perturbation
-            mutate_mask = torch.rand_like(pm)<self.config['mutate_prob']
-            pm[mutate_mask] = 1e-1*torch.randn(mutate_mask.sum()).to(pm) # some extreme perturbations
-            geno = pm
-
-            pm = p.co_geno.clone()
-            pm = pm + self.config['co_mutate_lr']*torch.randn_like(pm) # all small perturbation
-            mutate_mask = torch.rand_like(pm)<self.config['co_mutate_prob']
-            pm[mutate_mask] = 1e-1*torch.randn(mutate_mask.sum()).to(pm) # some extreme perturbations
-            co_geno = pm
-            dna = DNA(geno.detach(), co_geno.detach())
-
-            mutant.append(dna)
+        for geno in pop:
+            dna = geno.dna.clone()
+            dna = dna + self.config['mutate_lr']*torch.randn_like(dna) # all small perturbation
+            mutate_mask = torch.rand_like(dna)<self.config['mutate_prob']
+            dna[mutate_mask] = 1e-1*torch.randn(mutate_mask.sum()).to(dna) # some extreme perturbations
+            mutant.append(Genotype(dna))
         return mutant
     
-    def calc_co_mutate(self, pop):
+    def calc_co_mutate(self, co_pop):
         mutant = []
-        for p in pop:
-            pm = p.geno.clone()
-            pm = pm + self.config['mutate_lr']*torch.randn_like(pm) # all small perturbation
-            mutate_mask = torch.rand_like(pm)<self.config['mutate_prob']
-            pm[mutate_mask] = 1e-1*torch.randn(mutate_mask.sum()).to(pm) # some extreme perturbations
-            geno = pm
-
-            pm = p.co_geno.clone()
-            pm = pm + self.config['co_mutate_lr']*torch.randn_like(pm) # all small perturbation
-            mutate_mask = torch.rand_like(pm)<self.config['co_mutate_prob']
-            pm[mutate_mask] = 1e-1*torch.randn(mutate_mask.sum()).to(pm) # some extreme perturbations
-            co_geno = pm
-            dna = DNA(geno.detach(), co_geno.detach())
-
-            mutant.append(dna)
+        for geno in co_pop:
+            co_dna = geno.co_dna.clone()
+            co_dna = co_dna + self.config['co_mutate_lr']*torch.randn_like(co_dna) # all small perturbation
+            mutate_mask = torch.rand_like(co_dna)<self.config['co_mutate_prob']
+            co_dna[mutate_mask] = 1e-1*torch.randn(mutate_mask.sum()).to(co_dna) # some extreme perturbations
+            mutant.append(CrossoverGenotype(co_dna))
         return mutant
     
-    def calc_crossover(self, pop1, pop2):
+    def calc_crossover(self, pop1, pop2, co_pop):
         cross = []
         conet = self.comodel().to(self.device)
-        for geno1, geno2 in zip(pop1, pop2):
-            geno = DNA(None, geno1.co_geno.clone())
-            nn.utils.vector_to_parameters(geno1.co_geno, conet.parameters())
-            geno.geno = conet.crossover(geno1.geno, geno2.geno)
+        for geno1, geno2, co_geno in zip(pop1, pop2, co_pop):
+            dna1, dna2, co_dna = geno1.dna, geno2.dna, co_geno.co_dna
+            
+            nn.utils.vector_to_parameters(co_dna, conet.parameters())
+            dna = conet.crossover(geno1.dna, geno2.dna)
+            
+            cross.append(Genotype(dna, None))
 
-            cross.append(geno)
-
-        return cross
+        return util.to_np_obj_array(cross)
+    
+    def fitnesses_to_prob(self, fitnesses, prob_sm_const=None):
+        if prob_sm_const is None:
+            prob_sm_const = self.config['prob_sm_const']
+        prob = torch.from_numpy(fitnesses)
+        prob = (prob_sm_const*prob/prob.std()).softmax(dim=-1).numpy()
+        return prob
         
     def calc_next_population(self):
         self.pop = self.npop
         self.co_pop = self.co_npop
         
         self.calc_fitnesses_and_sort()
+        self.prob = self.fitnesses_to_prob(self.fitnesses)
+        
         self.calc_co_fitnesses_and_sort()
+        self.co_prob = self.fitnesses_to_prob(self.co_fitnesses)
         
         npop = []
         co_npop = []
         npop.extend(self.pop[-self.config['n_elite']:])
-        co_npop.extend(self.co_pop[-self.config['n_elite']:])
+        co_npop.extend(self.co_pop[-self.config['co_n_elite']:])
 
-        self.prob = torch.from_numpy(self.fitnesses)
-        self.prob = (self.config['prob_sm_const']*self.prob/self.prob.std()).softmax(dim=-1).numpy()
         
-        self.co_prob = torch.from_numpy(self.co_fitnesses)
-        self.co_prob = (self.config['prob_sm_const']*self.co_prob/self.co_prob.std()).softmax(dim=-1).numpy()
-        
-        n_parents = self.N-self.config['n_elite']
-        parents1 = np.random.choice(self.pop, size=n_parents, p=self.prob, replace=self.config['with_replacement'])
-        parents2 = np.random.choice(self.pop, size=n_parents, p=self.prob, replace=self.config['with_replacement'])
-        children = self.calc_crossover(parents1, parents2)
+        parents1 = np.random.choice(self.pop, size=self.n_parents, p=self.prob, replace=self.config['with_replacement'])
+        parents2 = np.random.choice(self.pop, size=self.n_parents, p=self.prob, replace=self.config['with_replacement'])
+        co_pop_for_parents = np.random.choice(self.co_pop, size=self.n_parents, p=self.co_prob, replace=self.config['with_replacement'])
+        children = self.calc_crossover(parents1, parents2, co_pop_for_parents)
         children = self.calc_mutate(children)
+        
+        co_children = self.calc_co_mutate(co_pop_for_parents)
 
         npop.extend(children)
+        co_npop.extend(co_children)
 
-        npop_arr = np.empty(self.N, dtype=object)
-        for i in range(self.N):
-            npop_arr[i] = npop[i]
-
-        self.npop = npop_arr
+        self.npop = util.to_np_obj_array(npop)
+        self.co_npop = util.to_np_obj_array(co_npop)
 
     def run_evolution(self, config=None, tqdm=None, logger=None, tag=None):
         if config is None:
