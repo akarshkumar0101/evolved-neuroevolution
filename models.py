@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class BigConvNet(nn.Module):
-    def __init__(self):
+    def __init__(self, config=None):
         super().__init__()
         self.conv1 = nn.Conv2d(1, 10, kernel_size=3)
         self.conv2 = nn.Conv2d(10, 10, kernel_size=3)
@@ -20,7 +20,7 @@ class BigConvNet(nn.Module):
         return x.softmax(dim=-1)
 
 class ConvNet(nn.Module):
-    def __init__(self):
+    def __init__(self, config=None):
         super().__init__()
         self.conv1 = nn.Conv2d(1, 2, kernel_size=3)
         self.conv2 = nn.Conv2d(2, 5, kernel_size=3)
@@ -36,7 +36,7 @@ class ConvNet(nn.Module):
         return x.softmax(dim=-1)
     
 class SmallNet(nn.Module):
-    def __init__(self):
+    def __init__(self, config=None):
         super().__init__()
         self.conv1 = nn.Conv2d(1, 1, kernel_size=3)
         self.conv2 = nn.Conv2d(1, 1, kernel_size=3)
