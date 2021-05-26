@@ -5,6 +5,66 @@ from torch import nn
 import util
 
 class Genotype():
+    def __init__(self, dna=None, config=None):
+        """
+        DNA is just another name for the genotype data of the 
+        phenotype, breeder/crossover network, and the decoder.
+        """
+        self.dna = dna
+        self.decoder_dna = decoder_dna
+        self.breeder_dna = breeder_dna
+        self.config = config
+    
+    def generate_random(model, comodel, config, device='cpu'):
+        dna = nn.utils.parameters_to_vector(model(config).parameters()).detach().to(device)
+        decoder_dna = None
+        breeder_dna = nn.utils.parameters_to_vector(comodel(config).parameters()).detach().to(device)
+        return Genotype(dna, decoder_dna, breeder_dna, config)
+        
+    def clone(self):
+        dna = None if self.dna is None else self.dna.clone()
+        decoder_dna = None if self.decoder_dna is None else self.decoder_dna.clone()
+        breeder_dna = None if self.breeder_dna is None else self.breeder_dna.clone()
+        return Genotype(dna, decoder_dna, breeder_dna, self.config)
+    
+    def mutate(self):
+        """
+        Mutation consists of 
+         - a small perturbation to the solution
+         - some extreme resets of some dimensions
+        """
+        # mutate DNA
+        dna = self.dna
+        if dna is not None:
+            dna = util.perturb_type1(dna, self.config['mutate_lr']).detach()
+            dna = util.perturb_type2(dna, self.config['mutate_prob']).detach()
+
+        # mutate decoder DNA
+        decoder_dna = self.decoder_dna
+        if decoder_dna is not None:
+            decoder_dna = util.perturb_type1(decoder_dna, self.config['decode_mutate_lr']).detach()
+            decoder_dna = util.perturb_type2(decoder_dna, self.config['decode_mutate_prob']).detach()
+            
+        # mutate breeder DNA
+        breeder_dna = self.breeder_dna
+        if breeder_dna is not None:
+            breeder_dna = util.perturb_type1(breeder_dna, self.config['breed_mutate_lr']).detach()
+            breeder_dna = util.perturb_type2(breeder_dna, self.config['breed_mutate_prob']).detach()
+            
+        return Genotype(dna, decoder_dna, breeder_dna, self.config)
+        
+    def crossover(self, another, conet):
+        nn.utils.vector_to_parameters(self.breeder_dna, conet.parameters())
+        dna = conet.crossover(self.dna, another.dna)
+        return Genotype(dna, self.decoder_dna, self.breeder_dna, self.config)
+    
+    def to_pheno(self, pheno=None):
+        nn.utils.vector_to_parameters(self.dna, pheno.parameters())
+        return pheno
+    
+    
+    
+class Genotype():
     def __init__(self, dna=None, decoder_dna=None):
         self.dna = dna
         self.decoder_dna = decoder_dna

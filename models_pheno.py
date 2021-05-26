@@ -51,3 +51,6 @@ class SmallNet(nn.Module):
         y = x
         x = self.fc1(x)
         return x.softmax(dim=-1)#, y, x
+    
+#     def get_weight_len():
+#         return len(torch.nn.utils.parameters_to_vector(SmallNet().parameters()))
