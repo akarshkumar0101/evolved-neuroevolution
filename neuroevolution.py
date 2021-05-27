@@ -96,7 +96,11 @@ class Neuroevolution:
     def get_init_population(self, N=None):
         if N is None:
             N = self.config['n_pop']
-        return np.array([Genotype.generate_random(self.model_pheno, self.model_decode, self.model_breed, self.config, self.device) for _ in range(N)])
+        pop = np.array([Genotype.generate_random(self.model_pheno, 
+                                                 self.model_decode, self.model_breed, 
+                                                 self.config, self.device) for _ in range(N)])
+        parent_idxs = np.arange(N)
+        return pop, parent_idxs
 
     def calc_fitnesses_and_sort(self):
         decoder = self.model_decode(self.config).to(self.device)
@@ -112,6 +116,7 @@ class Neuroevolution:
         
         fit_idx = np.argsort(self.fitdata['fitness'])[::-1]
         self.pop = self.pop[fit_idx]
+        self.parent_idxs = [self.parent_idxs[i] for i in fit_idx]
         for key in self.fitdata.keys():
             self.fitdata[key] = np.array(self.fitdata[key])[fit_idx]
             
@@ -167,17 +172,15 @@ class Neuroevolution:
         if config is None:
             config = self.config
             
-        self.npop = self.get_init_population()
+        self.npop, self.nparent_idxs = self.get_init_population()
         
         loop = range(config['n_gen'])
-        if tqdm is not None:
-            loop = tqdm(loop)
             
-        for gen_idx in loop:
-            self.pop = self.npop
+        for gen_idx in (tqdm(loop) if tqdm is not None else loop):
+            self.pop, self.parent_idxs = self.npop, self.nparent_idxs
             self.calc_fitnesses_and_sort()
             self.prob = self.fitnesses_to_prob(self.fitnesses)
-            self.npop, self.parent_idxs = self.calc_next_population(self.pop, self.prob)
+            self.npop, self.nparent_idxs = self.calc_next_population(self.pop, self.prob)
 
             if logger is not None:
                 # logging
@@ -209,7 +212,7 @@ class Neuroevolution:
         
         torch.save(self.pop, os.path.join(logger.log_dir, f'pop_gen_{gen_idx:05d}'))
         torch.save(self.fitnesses, os.path.join(logger.log_dir, f'fitnesses_gen_{gen_idx:05d}'))
-        torch.save(self.parent_idxs, os.path.join(logger.log_dir, f'parent_idxs_gen_{gen_idx+1:05d}'))
+        torch.save(self.parent_idxs, os.path.join(logger.log_dir, f'parent_idxs_gen_{gen_idx:05d}'))
         
         
 #         logger.add_scalars(f'bigger both perturb lr={lr}, prob={prob}',
