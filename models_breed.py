@@ -1,14 +1,25 @@
 import torch
 import torch.nn as nn
 
-class FirstParentIdentityBreeder(nn.Module):
+class Breeder(nn.Module):
     def __init__(self, config=None):
         super().__init__()
-        
+
+
+class FirstParentIdentityBreeder(Breeder):
+    def __init__(self, config=None):
+        super().__init__()
+    
     def breed_dna(self, dna1, dna2):
         return dna1
+    
+    def generate_random(config, device='cpu'):
+        return None
+    
+    def load_breeder_dna(self, breeder_dna):
+        pass
 
-class LinearBreeder(nn.Module):
+class LinearBreeder(Breeder):
     def __init__(self, config):
         super().__init__()
         d_in = config['dna_len']
@@ -31,8 +42,13 @@ class LinearBreeder(nn.Module):
     def breed_dna(self, dna1, dna2):
         return self(torch.cat([dna1, dna2])[None])[0]
     
+    def generate_random(config, device='cpu'):
+        return nn.utils.parameters_to_vector(LinearBreeder(config).parameters()).detach().to(device)
     
-class NonlinearBreeder(nn.Module):
+    def load_breeder_dna(self, breeder_dna):
+        nn.utils.vector_to_parameters(breeder_dna, self.parameters())
+    
+class NonlinearBreeder(Breeder):
     def __init__(self, config):
         super().__init__()
         d_in = config['dna_len']
@@ -48,7 +64,6 @@ class NonlinearBreeder(nn.Module):
         for lin in [self.lin1, self.lin2, self.lin3]:
             lin.weight.data = torch.eye(*lin.weight.shape).to(lin.weight)
             lin.bias.data = torch.zeros_like(lin.bias)
-        
 
     def forward(self, x):
         bs = len(x)
@@ -63,3 +78,9 @@ class NonlinearBreeder(nn.Module):
 
     def breed_dna(self, dna1, dna2):
         return self(torch.stack([dna1, dna2], dim=0)[None])[0]
+    
+    def generate_random(config, device='cpu'):
+        return nn.utils.parameters_to_vector(NonlinearBreeder(config).parameters()).detach().to(device)
+    
+    def load_breeder_dna(self, breeder_dna):
+        nn.utils.vector_to_parameters(breeder_dna, self.parameters())

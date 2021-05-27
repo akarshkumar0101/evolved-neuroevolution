@@ -1,8 +1,10 @@
+import os
 import numpy as np
 import torch
 from torch import nn
 
 import util
+import models_decode
 
 class Genotype():
     def __init__(self, dna=None, decoder_dna=None, breeder_dna=None, config=None):
@@ -16,10 +18,13 @@ class Genotype():
         self.config = config
     
     def generate_random(model_pheno, model_decode, model_breed, config, device='cpu'):
-#         dna = nn.utils.parameters_to_vector(model_pheno(config).parameters()).detach().to(device)
-        dna = 1e-2*torch.randn(config['dna_len']).to(device)
-        decoder_dna = nn.utils.parameters_to_vector(model_decode(config).parameters()).detach().to(device)
-        breeder_dna = nn.utils.parameters_to_vector(model_breed(config).parameters()).detach().to(device)
+        # TODO this is not proper initialization of pheno_dna/dna
+#         if config['dna_len'] is None:
+        dna = model_pheno.generate_random(config, device)
+#         else:
+#             dna = config['dna_init_std']*torch.randn(config['dna_len']).to(device)
+        decoder_dna = model_decode.generate_random(config, device)
+        breeder_dna = model_breed.generate_random(config, device)
         return Genotype(dna, decoder_dna, breeder_dna, config)
         
     def clone(self):
@@ -55,19 +60,19 @@ class Genotype():
         return Genotype(dna, decoder_dna, breeder_dna, self.config)
         
     def crossover(self, geno2, breeder):
-        nn.utils.vector_to_parameters(self.breeder_dna, breeder.parameters())
+        breeder.load_breeder_dna(self.breeder_dna)
         dna = breeder.breed_dna(self.dna, geno2.dna)
         return Genotype(dna, self.decoder_dna, self.breeder_dna, self.config)
     
     def to_pheno(self, decoder=None, pheno=None):
-        nn.utils.vector_to_parameters(self.decoder_dna, decoder.parameters())
-        weights = decoder.decode_dna(self.dna)
-        nn.utils.vector_to_parameters(weights, pheno.parameters())
+        decoder.load_decoder_dna(self.decoder_dna)
+        pheno_dna = decoder.decode_dna(self.dna)
+        pheno.load_pheno_dna(pheno_dna)
         return pheno
 
 
 class Neuroevolution:
-    def __init__(self, model_pheno, model_decode, model_breed, fitness_func, config, device='cpu'):
+    def __init__(self, model_pheno, model_decode, model_breed, fitness_func, config, device='cpu', verbose=False):
         self.model_pheno = model_pheno
         self.model_decode = model_decode
         self.model_breed = model_breed
@@ -78,6 +83,15 @@ class Neuroevolution:
         
         self.best_fitness = None
         self.fitness_v_gen_AUC = 0
+        
+        self.config['pheno_weight_len'] = len(nn.utils.parameters_to_vector(model_pheno(config).parameters()).detach())
+        if model_decode is models_decode.IdentityDecoder:
+            self.config['dna_len'] = self.config['pheno_weight_len']
+            
+        if verbose:
+            print('Running Neuroevolution with ')
+            print('DNA Length: ', self.config['dna_len'])
+        
         
     def get_init_population(self, N=None):
         if N is None:
@@ -96,7 +110,7 @@ class Neuroevolution:
                     self.fitdata[key] = []
                 self.fitdata[key].append(fitdata_i[key])
         
-        fit_idx = np.argsort(self.fitdata['fitness'])
+        fit_idx = np.argsort(self.fitdata['fitness'])[::-1]
         self.pop = self.pop[fit_idx]
         for key in self.fitdata.keys():
             self.fitdata[key] = np.array(self.fitdata[key])[fit_idx]
@@ -124,22 +138,34 @@ class Neuroevolution:
         pop and fitnesses must be sorted by fitness.
         """
         npop = []
-        npop.extend(pop[-self.config['n_elite']:])
-
+        parent_idxs = []
+        
+        npop.extend(pop[:self.config['n_elite']])
+        parent_idxs.extend(np.arange(self.config['n_elite']))
+        
         n_children = self.config['n_pop']-self.config['n_elite']
         if crossover:
-            parents1 = np.random.choice(pop, size=n_children, p=prob, replace=self.config['with_replacement'])
-            parents2 = np.random.choice(pop, size=n_children, p=prob, replace=self.config['with_replacement'])
+            parents1_idx = np.random.choice(np.arange(len(pop)), size=n_children, 
+                                            p=prob, replace=self.config['with_replacement'])
+            parents2_idx = np.random.choice(np.arange(len(pop)), size=n_children, 
+                                            p=prob, replace=self.config['with_replacement'])
+            parents1 = pop[parents1_idx]
+            parents2 = pop[parents2_idx]
             children = self.calc_crossover(parents1, parents2)
+            
+            parent_idxs.extend(np.stack([parents1_idx, parents2_idx], axis=-1))
         else:
-            children = np.random.choice(pop, size=n_children, p=prob, replace=self.config['with_replacement'])
+            parents1_idx = np.random.choice(np.arange(len(pop)), size=n_children, 
+                                            p=prob, replace=self.config['with_replacement'])
+            children = pop[parents1_idx]
+            parent_idxs.extend(parents1_idx)
         children = self.calc_mutate(children)
         npop.extend(children)
-        return np.array(npop)
+        return np.array(npop), parent_idxs
         
     def run_evolution(self, config=None, tqdm=None, logger=None, tag=None):
         if config is None:
-            config = self.config 
+            config = self.config
             
         self.npop = self.get_init_population()
         
@@ -151,7 +177,7 @@ class Neuroevolution:
             self.pop = self.npop
             self.calc_fitnesses_and_sort()
             self.prob = self.fitnesses_to_prob(self.fitnesses)
-            self.npop = self.calc_next_population(self.pop, self.prob)
+            self.npop, self.parent_idxs = self.calc_next_population(self.pop, self.prob)
 
             if logger is not None:
                 # logging
@@ -168,11 +194,23 @@ class Neuroevolution:
             logger.add_histogram(f'{tag}/{key}', data, global_step=gen_idx)
         logger.add_histogram(f'{tag}/prob_of_selection', self.prob, global_step=gen_idx)
         
-        all_dna_weights = torch.cat([geno.dna for geno in self.pop]).detach().cpu().numpy()
-        logger.add_histogram(f'{tag}/all_dna_weights', all_dna_weights, global_step=gen_idx)
+        if self.pop[0].dna is not None:
+            all_dna_weights = torch.cat([geno.dna for geno in self.pop]).detach().cpu().numpy()
+            logger.add_histogram(f'{tag}/all_dna_weights', all_dna_weights, global_step=gen_idx)
+        if self.pop[0].decoder_dna is not None:
+            all_decoder_dna_weights = torch.cat([geno.decoder_dna for geno in self.pop]).detach().cpu().numpy()
+            logger.add_histogram(f'{tag}/all_decoder_dna_weights', all_decoder_dna_weights, global_step=gen_idx)
+        if self.pop[0].breeder_dna is not None:
+            all_breeder_dna_weights = torch.cat([geno.breeder_dna for geno in self.pop]).detach().cpu().numpy()
+            logger.add_histogram(f'{tag}/all_breeder_dna_weights', all_breeder_dna_weights, global_step=gen_idx)
         
         
         logger.add_scalar(f'{tag}/gpu_mem_allocated', torch.cuda.memory_allocated(), global_step=gen_idx)
+        
+        torch.save(self.pop, os.path.join(logger.log_dir, f'pop_gen_{gen_idx:05d}'))
+        torch.save(self.fitnesses, os.path.join(logger.log_dir, f'fitnesses_gen_{gen_idx:05d}'))
+        torch.save(self.parent_idxs, os.path.join(logger.log_dir, f'parent_idxs_gen_{gen_idx+1:05d}'))
+        
         
 #         logger.add_scalars(f'bigger both perturb lr={lr}, prob={prob}',
 #                            {'max': np.max(fitnesses['nll']),
