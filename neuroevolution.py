@@ -108,7 +108,7 @@ class Neuroevolution:
         self.fitdata = {}
         for geno in self.pop:
             agent = geno.to_pheno(decoder, agent)
-            fitdata_i = self.fitness_func(agent)
+            fitdata_i = self.fitness_func(agent, device=self.device)
             for key in fitdata_i.keys():
                 if key not in self.fitdata.keys():
                     self.fitdata[key] = []
