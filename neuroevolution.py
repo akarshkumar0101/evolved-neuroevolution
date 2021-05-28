@@ -19,10 +19,10 @@ class Genotype():
     
     def generate_random(model_pheno, model_decode, model_breed, config, device='cpu'):
         # TODO this is not proper initialization of pheno_dna/dna
-#         if config['dna_len'] is None:
-        dna = model_pheno.generate_random(config, device)
-#         else:
-#             dna = config['dna_init_std']*torch.randn(config['dna_len']).to(device)
+        if config['dna_len']==config['pheno_weight_len']:
+            dna = model_pheno.generate_random(config, device)
+        else:
+            dna = config['dna_init_std']*torch.randn(config['dna_len']).to(device)
         decoder_dna = model_decode.generate_random(config, device)
         breeder_dna = model_breed.generate_random(config, device)
         return Genotype(dna, decoder_dna, breeder_dna, config)
@@ -214,6 +214,8 @@ class Neuroevolution:
         torch.save(self.fitnesses, os.path.join(logger.log_dir, f'fitnesses_gen_{gen_idx:05d}'))
         torch.save(self.parent_idxs, os.path.join(logger.log_dir, f'parent_idxs_gen_{gen_idx:05d}'))
         
+        if gen_idx==0:
+            torch.save(self.config, os.path.join(logger.log_dir, 'config'))
         
 #         logger.add_scalars(f'bigger both perturb lr={lr}, prob={prob}',
 #                            {'max': np.max(fitnesses['nll']),
