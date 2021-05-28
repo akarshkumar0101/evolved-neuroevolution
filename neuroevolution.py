@@ -7,6 +7,7 @@ import util
 import models_decode
 
 class Genotype():
+    id_factory = 0
     def __init__(self, dna=None, decoder_dna=None, breeder_dna=None, config=None):
         """
         DNA is just another name for the genotype data of the 
@@ -16,6 +17,9 @@ class Genotype():
         self.decoder_dna = decoder_dna
         self.breeder_dna = breeder_dna
         self.config = config
+        
+        self.id = Genotype.id_factory
+        Genotype.id_factory += 1
     
     def generate_random(model_pheno, model_decode, model_breed, config, device='cpu'):
         # TODO this is not proper initialization of pheno_dna/dna
@@ -90,8 +94,22 @@ class Neuroevolution:
             
         if verbose:
             print('Running Neuroevolution with ')
-            print('DNA Length: ', self.config['dna_len'])
-        
+            print('Population: ', self.config['n_pop'])
+            print('Generations: ', self.config['n_gen'])
+            n_params_total = 0
+            n_params = self.config['dna_len']
+            n_params_total += n_params
+            print(f'DNA     # params: {n_params:05d}')
+            n_params = np.sum([p.numel() for p in model_pheno(config).parameters()], dtype=int)
+            n_params_total += n_params
+            print(f'Pheno   # params: {n_params:05d}')
+            n_params = np.sum([p.numel() for p in model_decode(config).parameters()], dtype=int)
+            n_params_total += n_params
+            print(f'Decoder # params: {n_params:05d}')
+            n_params = np.sum([p.numel() for p in model_breed(config).parameters()], dtype=int)
+            n_params_total += n_params
+            print(f'Breeder # params: {n_params:05d}')
+            print(f'Total   # params: {n_params_total:05d}')
         
     def get_init_population(self, N=None):
         if N is None:
