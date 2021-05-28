@@ -74,6 +74,7 @@ class NonlinearBreeder(Breeder):
         x = torch.sigmoid(x)
         x = self.lin3(x)
 #         return (a+b)/2. + x*self.amount
+        x = torch.tanh(x)
         return x
 
     def breed_dna(self, dna1, dna2):
