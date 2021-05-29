@@ -8,7 +8,8 @@ import models_decode
 
 class Genotype():
     id_factory = 0
-    def __init__(self, dna=None, decoder_dna=None, breeder_dna=None, config=None):
+    def __init__(self, dna=None, decoder_dna=None, breeder_dna=None, config=None, 
+                 genos_parent=None, orgin_type=None):
         """
         DNA is just another name for the genotype data of the 
         phenotype, breeder/crossover network, and the decoder.
@@ -17,6 +18,9 @@ class Genotype():
         self.decoder_dna = decoder_dna
         self.breeder_dna = breeder_dna
         self.config = config
+        
+        if genos_parent is not None:
+            self.parents_id = [geno.id for geno in genos_parent]
         
         self.id = Genotype.id_factory
         Genotype.id_factory += 1
@@ -29,13 +33,13 @@ class Genotype():
             dna = config['dna_init_std']*torch.randn(config['dna_len']).to(device)
         decoder_dna = model_decode.generate_random(config, device)
         breeder_dna = model_breed.generate_random(config, device)
-        return Genotype(dna, decoder_dna, breeder_dna, config)
+        return Genotype(dna, decoder_dna, breeder_dna, config, None, 'random')
         
     def clone(self):
         dna = None if self.dna is None else self.dna.clone()
         decoder_dna = None if self.decoder_dna is None else self.decoder_dna.clone()
         breeder_dna = None if self.breeder_dna is None else self.breeder_dna.clone()
-        return Genotype(dna, decoder_dna, breeder_dna, self.config)
+        return Genotype(dna, decoder_dna, breeder_dna, self.config, [self], 'clone')
     
     def mutate(self):
         """
@@ -61,19 +65,20 @@ class Genotype():
             breeder_dna = util.perturb_type1(breeder_dna, self.config['breed_mutate_lr']).detach()
             breeder_dna = util.perturb_type2(breeder_dna, self.config['breed_mutate_prob']).detach()
             
-        return Genotype(dna, decoder_dna, breeder_dna, self.config)
+        return Genotype(dna, decoder_dna, breeder_dna, self.config, [self], 'mutate')
         
     def crossover(self, geno2, breeder):
         breeder.load_breeder_dna(self.breeder_dna)
         dna = breeder.breed_dna(self.dna, geno2.dna)
-        return Genotype(dna, self.decoder_dna, self.breeder_dna, self.config)
+        return Genotype(dna, self.decoder_dna, self.breeder_dna, self.config, [self, geno2], 'crossover')
     
     def to_pheno(self, decoder=None, pheno=None):
         decoder.load_decoder_dna(self.decoder_dna)
         pheno_dna = decoder.decode_dna(self.dna)
         pheno.load_pheno_dna(pheno_dna)
         return pheno
-
+    
+    
 
 class Neuroevolution:
     def __init__(self, model_pheno, model_decode, model_breed, fitness_func, config, device='cpu', verbose=False):
@@ -139,6 +144,9 @@ class Neuroevolution:
             self.fitdata[key] = np.array(self.fitdata[key])[fit_idx]
             
         self.fitnesses = self.fitdata['fitness']
+    
+    def calc_clone(self, pop):
+        return np.array([geno.clone() for geno in pop])
 
     def calc_mutate(self, pop):
         return np.array([geno.mutate() for geno in pop])
@@ -163,8 +171,10 @@ class Neuroevolution:
         npop = []
         parent_idxs = []
         
-        npop.extend(pop[:self.config['n_elite']])
-        parent_idxs.extend(np.arange(self.config['n_elite']))
+        n_elite_idxs = np.argsort(prob)[::-1][:self.config['n_elite']]
+        
+        npop.extend(self.calc_clone(pop[n_elite_idxs]))
+        parent_idxs.extend(n_elite_idxs)
         
         n_children = self.config['n_pop']-self.config['n_elite']
         if crossover:
