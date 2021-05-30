@@ -5,28 +5,24 @@ class Breeder(nn.Module):
     def __init__(self, config=None):
         super().__init__()
 
-
 class FirstParentIdentityBreeder(Breeder):
-    def __init__(self, config=None):
+    def __init__(self, **kwargs):
         super().__init__()
     
     def breed_dna(self, dna1, dna2):
         return dna1
     
-    def generate_random(config, device='cpu'):
-        return None
-    
     def load_breeder_dna(self, breeder_dna):
         pass
 
 class LinearBreeder(Breeder):
-    def __init__(self, config):
+    def __init__(self, **kwargs):
         super().__init__()
-        d_in = config['dna_len']
+        d_in = kwargs['dna_len']
         
         self.lin1 = nn.Linear(2*d_in, d_in)
         
-        if config['breed_weight_init_for_first_parent']:
+        if kwargs['breed_weight_init_for_first_parent']:
             self.init_weights_for_first_parent()
         
     def init_weights_for_first_parent(self):
@@ -42,22 +38,16 @@ class LinearBreeder(Breeder):
     def breed_dna(self, dna1, dna2):
         return self(torch.cat([dna1, dna2])[None])[0]
     
-    def generate_random(config, device='cpu'):
-        return nn.utils.parameters_to_vector(LinearBreeder(config).parameters()).detach().to(device)
-    
-    def load_breeder_dna(self, breeder_dna):
-        nn.utils.vector_to_parameters(breeder_dna, self.parameters())
-    
 class NonlinearBreeder(Breeder):
-    def __init__(self, config):
+    def __init__(self, **kwargs):
         super().__init__()
-        d_in = config['dna_len']
+        d_in = kwargs['dna_len']
 
         self.lin1 = nn.Linear(n, n)
         self.lin2 = nn.Linear(2*n, n)
         self.lin3 = nn.Linear(n, n)
         
-        if config['breed_weight_init_for_first_parent']:
+        if kwargs['breed_weight_init_for_first_parent']:
             self.init_weights_for_first_parent()
         
     def init_weights_for_first_parent(self):

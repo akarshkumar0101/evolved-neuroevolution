@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 
 class BigConvNet(nn.Module):
-    def __init__(self, config=None):
+    def __init__(self, **kwargs):
         super().__init__()
         self.conv1 = nn.Conv2d(1, 10, kernel_size=3)
         self.conv2 = nn.Conv2d(10, 10, kernel_size=3)
@@ -18,15 +18,9 @@ class BigConvNet(nn.Module):
         x = torch.relu(self.fc1(x))
         x = self.fc2(x)
         return x.softmax(dim=-1)
-    
-    def generate_random(config, device='cpu'):
-        return nn.utils.parameters_to_vector(BigConvNet(config).parameters()).detach().to(device)
-    
-    def load_pheno_dna(self, pheno_dna):
-        nn.utils.vector_to_parameters(pheno_dna, self.parameters())
 
 class ConvNet(nn.Module):
-    def __init__(self, config=None):
+    def __init__(self, **kwargs):
         super().__init__()
         self.conv1 = nn.Conv2d(1, 2, kernel_size=3)
         self.conv2 = nn.Conv2d(2, 5, kernel_size=3)
@@ -41,14 +35,8 @@ class ConvNet(nn.Module):
         x = self.fc1(x)
         return x.softmax(dim=-1)
     
-    def generate_random(config, device='cpu'):
-        return nn.utils.parameters_to_vector(ConvNet(config).parameters()).detach().to(device)
-    
-    def load_pheno_dna(self, pheno_dna):
-        nn.utils.vector_to_parameters(pheno_dna, self.parameters())
-    
 class SmallNet(nn.Module):
-    def __init__(self, config=None):
+    def __init__(self, **kwargs):
         super().__init__()
         self.conv1 = nn.Conv2d(1, 1, kernel_size=3)
         self.conv2 = nn.Conv2d(1, 1, kernel_size=3)
@@ -63,9 +51,3 @@ class SmallNet(nn.Module):
         y = x
         x = self.fc1(x)
         return x.softmax(dim=-1)#, y, x
-    
-    def generate_random(config, device='cpu'):
-        return nn.utils.parameters_to_vector(SmallNet(config).parameters()).detach().to(device)
-    
-    def load_pheno_dna(self, pheno_dna):
-        nn.utils.vector_to_parameters(pheno_dna, self.parameters())
