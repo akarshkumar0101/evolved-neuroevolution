@@ -91,35 +91,38 @@ class Neuroevolution:
             print('Running Neuroevolution with ')
             print('Population: ', evol_config['n_pop'])
             print('Generations: ', evol_config['n_gen'])
-#             n_params_total = 0
-#             n_params = self.config['dna_len']
-#             n_params_total += n_params
-#             print(f'DNA     # params: {n_params:05d}')
-#             n_params = np.sum([p.numel() for p in self.config['pheno'].parameters()], dtype=int)
-#             n_params_total += n_params
-#             print(f'Pheno   # params: {n_params:05d}')
-#             n_params = np.sum([p.numel() for p in self.config['decoder'].parameters()], dtype=int)
-#             n_params_total += n_params
-#             print(f'Decoder # params: {n_params:05d}')
-#             n_params = np.sum([p.numel() for p in self.config['breeder'].parameters()], dtype=int)
-#             n_params_total += n_params
-#             print(f'Breeder # params: {n_params:05d}')
-#             print(f'Total   # params: {n_params_total:05d}')
+            pheno, decoder, breeder = self.init_pheno_decoder_breeder()
+            n_params = len(util.model2vec(pheno))
+            print(f'Pheno   # params: {n_params:05d}')
+            print('------------------')
+            n_params_total = 0
+            n_params = geno_config['dna_len']; n_params_total += n_params
+            print(f'DNA     # params: {n_params:05d}')
+            n_params = len(util.model2vec(decoder)); n_params_total += n_params
+            print(f'Decoder # params: {n_params:05d}')
+            n_params = len(util.model2vec(breeder)); n_params_total += n_params
+            print(f'Breeder # params: {n_params:05d}')
+            print(f'Total   # params: {n_params_total:05d}')
         
     def calc_clone(self, pop):
         return np.array([geno.clone() for geno in pop])
 
     def calc_mutate(self, pop):
         return np.array([geno.mutate(**self.geno_config) for geno in pop])
+    
+    def init_pheno_decoder_breeder(self):
+        pheno = self.geno_config['pheno_class'](**self.geno_config).to(self.device)
+        decoder = self.geno_config['decoder_class'](**self.geno_config).to(self.device)
+        breeder = self.geno_config['breeder_class'](**self.geno_config).to(self.device)
+        return pheno, decoder, breeder
 
     def calc_crossover(self, pop1, pop2):
-        breeder = self.geno_config['breeder_class'](**self.geno_config).to(self.device)
+        _, _, breeder = self.init_pheno_decoder_breeder()
         return np.array([geno1.crossover(geno2, breeder=breeder) for geno1, geno2 in zip(pop1, pop2)])
     
     def calc_fitdata(self, pop):
         fitdata = []
-        decoder = self.geno_config['decoder_class'](**self.geno_config).to(self.device)
-        pheno = self.geno_config['pheno_class'](**self.geno_config).to(self.device)
+        pheno, decoder, _ = self.init_pheno_decoder_breeder()
         for geno in pop:
             pheno = geno.to_pheno(decoder, pheno)
             data = self.evol_config['fitness_func'](pheno, device=self.device)
@@ -142,11 +145,12 @@ class Neuroevolution:
                                                         self.calc_clone, self.calc_mutate, 
                                                         self.calc_crossover, **self.evol_config)
             
-
             if logger is not None:
                 self.log_stats(gen_idx, logger, tag)
 
     def log_stats(self, gen_idx, logger, tag=None):
+        logger.add_scalar(f'{tag}/gpu_mem_allocated', torch.cuda.memory_allocated(), global_step=gen_idx)
+        
         self.best_fitness = np.max(self.fitdata['fitness']) if self.best_fitness is None else max(self.best_fitness, np.max(self.fitdata['fitness']))
                 
         self.fitness_v_gen_AUC += np.max(self.fitdata['fitness'])
@@ -157,22 +161,20 @@ class Neuroevolution:
             logger.add_histogram(f'{tag}/{key}', data, global_step=gen_idx)
         logger.add_histogram(f'{tag}/prob_of_selection', self.prob, global_step=gen_idx)
         
-#         if self.pop[0].dna is not None:
-#             all_dna_weights = torch.cat([geno.dna for geno in self.pop]).detach().cpu().numpy()
-#             logger.add_histogram(f'{tag}/all_dna_weights', all_dna_weights, global_step=gen_idx)
-#         if self.pop[0].decoder_dna is not None:
-#             all_decoder_dna_weights = torch.cat([geno.decoder_dna for geno in self.pop]).detach().cpu().numpy()
-#             logger.add_histogram(f'{tag}/all_decoder_dna_weights', all_decoder_dna_weights, global_step=gen_idx)
-#         if self.pop[0].breeder_dna is not None:
-#             all_breeder_dna_weights = torch.cat([geno.breeder_dna for geno in self.pop]).detach().cpu().numpy()
-#             logger.add_histogram(f'{tag}/all_breeder_dna_weights', all_breeder_dna_weights, global_step=gen_idx)
+        if self.pop[0].dna is not None:
+            all_dna_weights = torch.cat([geno.dna for geno in self.pop]).detach().cpu()
+            logger.add_histogram(f'{tag}/all_dna_weights', all_dna_weights, global_step=gen_idx)
+        if self.pop[0].decoder_dna is not None:
+            all_decoder_dna_weights = torch.cat([geno.decoder_dna for geno in self.pop]).detach().cpu()
+            if all_decoder_dna_weights.numel()>0:
+                logger.add_histogram(f'{tag}/all_decoder_dna_weights', all_decoder_dna_weights, global_step=gen_idx)
+        if self.pop[0].breeder_dna is not None:
+            all_breeder_dna_weights = torch.cat([geno.breeder_dna for geno in self.pop]).detach().cpu()
+            if all_breeder_dna_weights.numel()>0:
+                logger.add_histogram(f'{tag}/all_breeder_dna_weights', all_breeder_dna_weights, global_step=gen_idx)
         
-        
-        logger.add_scalar(f'{tag}/gpu_mem_allocated', torch.cuda.memory_allocated(), global_step=gen_idx)
-        
-#         torch.save(self.pop, os.path.join(logger.log_dir, f'pop_gen_{gen_idx:05d}'))
-#         torch.save(self.fitnesses, os.path.join(logger.log_dir, f'fitnesses_gen_{gen_idx:05d}'))
-#         torch.save(self.parent_idxs, os.path.join(logger.log_dir, f'parent_idxs_gen_{gen_idx:05d}'))
+        torch.save(self.pop, os.path.join(logger.log_dir, f'pop_gen_{gen_idx:05d}.pop'))
+        torch.save(self.fitdata, os.path.join(logger.log_dir, f'fitdata_gen_{gen_idx:05d}'))
         
         if gen_idx==0:
             torch.save(self.geno_config, os.path.join(logger.log_dir, 'geno_config'))
