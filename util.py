@@ -37,3 +37,34 @@ def vec2model(v, model):
         raise Exception('Not correct number of parameters')
     nn.utils.vector_to_parameters(v, model.parameters())
     return model
+
+def dict_list2list_dict(DL):
+    return [dict(zip(DL,t)) for t in zip(*DL.values())]
+
+def list_dict2dict_list(LD):
+    return {k: np.array([dic[k] for dic in LD]) for k in LD[0]}
+
+def dict_arr2arr_dict(DA):
+    key = list(DA.keys())[0]
+    res = np.empty(DA[key].size, dtype=object)
+    for i in range(res.size):
+        res[i] = {key: DA[key].ravel()[i] for key in DA.keys()}
+    res = res.reshape(DA[key].shape)
+    return res
+
+def arr_dict2dict_arr(AD):
+    res = {}
+    e = AD.ravel()[0]
+    for key in e.keys():
+        res[key] = np.empty(AD.size, dtype=object)
+        for i, el in enumerate(AD.ravel()):
+            res[key][i] = el[key]
+        res[key] = res[key].reshape(AD.shape)
+    return res
+
+def arr_dict_mean(AD, axis=-1):
+    DA = arr_dict2dict_arr(AD)
+    return dict_arr2arr_dict({key:DA[key].mean(axis=axis) for key in DA.keys()})
+
+def dict_arr_mean(DA, axis=-1):
+    return {key:DA[key].mean(axis=axis) for key in DA.keys()}
