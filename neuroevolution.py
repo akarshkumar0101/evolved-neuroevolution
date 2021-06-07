@@ -8,72 +8,6 @@ import models_decode
 import population
 import genotype
 
-class CombinedGenotype():
-    id_factory = 0
-    def __init__(self, dna=None, decoder_dna=None, breeder_dna=None, 
-                 genos_parent=None, orgin_type=None):
-        """
-        DNA is just another name for the genotype data of the 
-        phenotype, breeder/crossover network, and the decoder.
-        """
-        self.dna = dna.clip(-2., 2.)
-        self.decoder_dna = decoder_dna
-        self.breeder_dna = breeder_dna
-        
-        if genos_parent is not None:
-            self.parents_id = [geno.id for geno in genos_parent]
-        
-        self.id = CombinedGenotype.id_factory
-        CombinedGenotype.id_factory += 1
-    
-    def generate_random(**kwargs):
-        pc, dc, bc, device = [kwargs[i] for i in 
-                              ['pheno_class', 'decoder_class', 'breeder_class', 'device']]
-        
-        # TODO this is not proper initialization of pheno_dna/dna
-        if kwargs['dna_len']==kwargs['pheno_weight_len']:
-            dna = util.model2vec(pc(**kwargs)).to(device)
-        else:
-            dna = kwargs['dna_init_std']*torch.randn(kwargs['dna_len']).to(device)
-        decoder_dna = util.model2vec(dc(**kwargs)).to(device)
-        breeder_dna = util.model2vec(bc(**kwargs)).to(device)
-        return CombinedGenotype(dna, decoder_dna, breeder_dna, None, 'random')
-        
-    def clone(self):
-        return CombinedGenotype(self.dna, self.decoder_dna, self.breeder_dna, [self], 'clone')
-    
-    def mutate(self, **kwargs):
-        """
-        Mutation consists of 
-         - a small perturbation to the solution
-         - some extreme resets of some dimensions
-        """
-        dna = self.dna
-        if dna is not None:
-            dna = util.perturb_type1(dna, kwargs['dna_mutate_lr']).detach()
-            dna = util.perturb_type2(dna, kwargs['dna_mutate_prob']).detach()
-        decoder_dna = self.decoder_dna
-        if decoder_dna is not None:
-            decoder_dna = util.perturb_type1(decoder_dna, kwargs['decode_mutate_lr']).detach()
-            decoder_dna = util.perturb_type2(decoder_dna, kwargs['decode_mutate_prob']).detach()
-        breeder_dna = self.breeder_dna
-        if breeder_dna is not None:
-            breeder_dna = util.perturb_type1(breeder_dna, kwargs['breed_mutate_lr']).detach()
-            breeder_dna = util.perturb_type2(breeder_dna, kwargs['breed_mutate_prob']).detach()
-        return CombinedGenotype(dna, decoder_dna, breeder_dna, [self], 'mutate')
-    
-    def crossover(self, geno2, breeder):
-        breeder = util.vec2model(self.breeder_dna, breeder)
-        dna = breeder.breed_dna(self.dna, geno2.dna)
-        return CombinedGenotype(dna, self.decoder_dna, self.breeder_dna, [self, geno2], 'breed')
-        
-    def to_pheno(self, decoder, pheno):
-        decoder = util.vec2model(self.decoder_dna, decoder)
-        pheno_dna = decoder.decode_dna(self.dna)
-        pheno = util.vec2model(pheno_dna, pheno)
-        return pheno
-    
-
 class Neuroevolution:
     def __init__(self, geno_config, evol_config, device='cpu', verbose=False):
         self.geno_config = geno_config
@@ -83,11 +17,13 @@ class Neuroevolution:
         self.best_fitness_ever_seen = None
         self.fitness_v_gen_AUC = 0
         
-        pheno, decoder, breeder = self.init_pheno_decoder_breeder()
-        dwl = len(util.model2vec(decoder))
-        bwl = len(util.model2vec(breeder))
+        pheno = self.geno_config['pheno_class'](**self.geno_config).to(self.device)
         pwl = len(util.model2vec(pheno))
         geno_config['pheno_weight_len'] = pwl
+        decoder = self.geno_config['decoder_class'](**self.geno_config).to(self.device)
+        breeder = self.geno_config['breeder_class'](**self.geno_config).to(self.device)
+        dwl = len(util.model2vec(decoder))
+        bwl = len(util.model2vec(breeder))
         if geno_config['decoder_class'] is models_decode.IdentityDecoder:
             geno_config['dna_len'] = geno_config['pheno_weight_len']
         dna_len = geno_config['dna_len']
@@ -132,7 +68,9 @@ class Neuroevolution:
                               for _ in range(self.evol_config['n_pop'])])
         
         loop = range(self.evol_config['n_gen'])
-        for gen_idx in (tqdm(loop) if tqdm is not None else loop):
+        if tqdm is not None:
+            loop = tqdm(loop)
+        for gen_idx in loop:
             self.pop = self.npop
             self.fitdata = self.calc_fitdata(self.pop)
             
@@ -141,6 +79,7 @@ class Neuroevolution:
             self.npop = population.calc_next_population(self.pop, self.prob, 
                                                         self.calc_clone, self.calc_mutate, 
                                                         self.calc_crossover, **self.evol_config)
+            loop.set_postfix({'fitness': np.max(util.arr_dict2dict_arr(self.fitdata)['fitness'])})
             
             if logger is not None:
                 self.log_stats(gen_idx, logger, tag)
