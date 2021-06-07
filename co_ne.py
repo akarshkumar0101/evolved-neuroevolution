@@ -163,6 +163,7 @@ class Neuroevolution:
 
     def calc_crossover(self, pop1, pop2):
         _, _, breeder = self.init_pheno_decoder_breeder()
+        # TODO make this sample from breeders based on breeder fitness
         geno_breeders = np.random.choice(self.pop_breeder, size=len(pop1))
         return np.array([geno1.crossover(geno_breeder, geno2, breeder=breeder) 
                          for geno_breeder, geno1, geno2 in zip(geno_breeders, pop1, pop2)])
