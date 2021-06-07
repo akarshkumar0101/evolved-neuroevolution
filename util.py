@@ -56,7 +56,7 @@ def arr_dict2dict_arr(AD):
     res = {}
     e = AD.ravel()[0]
     for key in e.keys():
-        res[key] = np.empty(AD.size, dtype=object)
+        res[key] = np.empty(AD.size, dtype=type(list(e.values())[0]))
         for i, el in enumerate(AD.ravel()):
             res[key][i] = el[key]
         res[key] = res[key].reshape(AD.shape)
