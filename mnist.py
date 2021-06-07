@@ -53,7 +53,7 @@ class MNIST:
         accuracy = n_correct/total*100.
         if show_stats:
             print(f'Average Loss: {loss_total:.03f}, Accuracy: {accuracy:.03f}%')
-        return loss_total, accuracy
+        return {'loss': loss_total, 'accuracy': accuracy}
 
 
     def calc_pheo_fitness(self, pheno, n_sample=1000, device='cpu', ds='train'):
