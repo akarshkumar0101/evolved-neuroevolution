@@ -1,3 +1,5 @@
+import torch
+
 import util
 
 class Genotype():
@@ -13,6 +15,49 @@ class Genotype():
         else:
             self.parents_id =[]
         self.origin_type = origin_type
+        
+class GenotypeContinuousMaskedDNA(Genotype):
+    def __init__(self, weights=None, mask=None, genos_parent=None, origin_type=None):
+        super().__init__(genos_parent, origin_type)
+        self.weights = weights.clip(-2., 2.)
+        self.mask = mask
+    
+    def generate_random(**kwargs):
+        pc, device = [kwargs[i] for i in ['pheno_class', 'device']]
+        
+        dna = util.model2vec(pc(**kwargs)).to(device)
+        mask = torch.zeros_like(dna, dtype=bool)
+        return GenotypeContinuousDNA(dna, None, 'random')
+        
+    def clone(self):
+        return GenotypeContinuousDNA(self.weights, self.mask, [self], 'clone')
+    
+    def mutate(self, **kwargs):
+        """
+        Mutation consists of 
+         - a small perturbation to the solution
+         - some extreme resets of some dimensions
+        """
+        weights = util.perturb_type1(self.weights, kwargs['dna_mutate_lr']).detach()
+        mask = util.perturb_type3(self.mask, kwargs['dna_mutate_prob']).detach()
+        
+        return GenotypeContinuousDNA(weights, mask, [self], 'mutate')
+    
+    def crossover(self, geno2, geno_breeder, breeder):
+        weights = self.weights
+        mask = self.mask
+        
+        m = torch.rand_like(weights)<.5
+        weights[m] = geno2.weights[m]
+        m = torch.rand_like(mask)<.5
+        mask[m] = geno2.mask[m]
+        return GenotypeContinuousDNA(weights, mask, [self, geno2], 'breed')
+    
+    def load_pheno(self, pheno):
+        w = torch.zeros_like(self.weights)
+        w[self.mask] = self.weights[self.mask]
+        pheno = util.vec2model(w, pheno)
+        return pheno
 
 class GenotypeContinuousDNA(Genotype):
     def __init__(self, dna=None, genos_parent=None, origin_type=None):
