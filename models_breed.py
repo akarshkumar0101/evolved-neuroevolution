@@ -125,3 +125,30 @@ class ElementwiseNonsharedLinearBreeder(Breeder):
     
     def breed_dna(self, dna1, dna2):
         return self(torch.stack([dna1, dna2], dim=-1))
+    
+class ConvBreeder(Breeder):
+    def __init__(self, **kwargs):
+        super().__init__()
+
+        self.seq = nn.Sequential(*[
+            nn.Conv1d(2, 4, 5),
+            nn.ReLU(),
+            nn.MaxPool1d(2),
+            nn.Conv1d(4, 8, 5),
+            nn.ReLU(),
+            nn.MaxPool1d(2),
+            nn.Conv1d(8, 8, 5),
+            nn.ReLU(),
+            nn.MaxPool1d(3),
+            nn.Conv1d(8, 13, 5),
+            nn.MaxPool1d(1),
+            nn.Tanh(),
+        ])
+        
+    def forward(self, x):
+        x = self.seq(x)
+        x = x.flatten(len(x), -1)[:, :-1]
+        return x
+    
+    def breed_dna(self, dna1, dna2):
+        return self(torch.stack([dna1, dna2], dim=-2)[None])[0]

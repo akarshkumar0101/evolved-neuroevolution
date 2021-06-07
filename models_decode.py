@@ -75,7 +75,7 @@ class NonlinearDecoderSmall(Decoder):
             x = torch.tanh(lin(x))
         return x
     
-class ConvDecoder(nn.Module):
+class ConvDecoder(Decoder):
     def __init__(self, **kwargs):
         super().__init__()
 
@@ -95,6 +95,7 @@ class ConvDecoder(nn.Module):
         ])
         
     def forward(self, x):
-        x = self.seq(x)
+        x = self.seq(x[:, None, :])
+        x = x.flatten(len(x), -1)
         return x
     
