@@ -30,7 +30,6 @@ class IdentityDecoder(Decoder):
     
     def load_decoder_dna(self, decoder_dna):
         pass
-        
     
 class LinearDecoder(Decoder):
     def __init__(self, **kwargs):
@@ -52,7 +51,6 @@ class LinearDecoder(Decoder):
         bs = len(x)
         x = self.lin1(x)
         return x
-
 
 class NonlinearDecoderSmall(Decoder):
     def __init__(self, **kwargs):
@@ -76,3 +74,27 @@ class NonlinearDecoderSmall(Decoder):
         for lin in self.lins:
             x = torch.tanh(lin(x))
         return x
+    
+class ConvDecoder(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+
+        self.seq = nn.Sequential(*[
+            nn.Conv1d(1, 4, 5),
+            nn.ReLU(),
+            nn.MaxPool1d(3),
+            nn.Conv1d(4, 8, 5),
+            nn.ReLU(),
+            nn.MaxPool1d(3),
+            nn.Conv1d(8, 8, 5),
+            nn.ReLU(),
+            nn.MaxPool1d(3),
+            nn.Conv1d(8, 13, 5),
+            nn.MaxPool1d(3),
+            nn.Tanh(),
+        ])
+        
+    def forward(self, x):
+        x = self.seq(x)
+        return x
+    
