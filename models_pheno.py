@@ -1,6 +1,20 @@
 import torch
 import torch.nn as nn
 
+class MassiveConvNet(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.conv1 = nn.Conv2d(1, 8, 5, padding=2)
+        self.conv2 = nn.Conv2d(8, 16, 5, padding=2)
+        self.fc1 = nn.Linear(16*7*7, 10)
+
+    def forward(self, x):
+        x = torch.max_pool2d(torch.relu(self.conv1(x)), 2)
+        x = torch.max_pool2d(torch.relu(self.conv2(x)), 2)
+        x = x.view(-1, 16*7*7)
+        x = self.fc1(x)
+        return x.softmax(dim=-1)
+
 class BigConvNet(nn.Module):
     def __init__(self, **kwargs):
         super().__init__()
