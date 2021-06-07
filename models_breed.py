@@ -65,3 +65,63 @@ class NonlinearBreederSmall(Breeder):
     def breed_dna(self, dna1, dna2):
         return self(torch.stack([dna1, dna2], dim=0)[None])[0]
     
+    
+class AverageBreeder(Breeder):
+    def __init__(self, **kwargs):
+        super().__init__()
+        
+    def forward(self, x):
+        return x.mean(dim=-1)
+
+    def breed_dna(self, dna1, dna2):
+        return self(torch.stack([dna1, dna2], dim=-1))
+    
+class RandomSwapBreeder(Breeder):
+    def __init__(self, **kwargs):
+        super().__init__()
+        if 'breeder_swap_prob' in kwargs:
+            self.p = kwargs['breeder_swap_prob']
+        else:
+            self.p = 0.5
+        
+    def breed_dna(self, dna1, dna2):
+        dna = dna1.clone()
+        mask = torch.rand(size=dna.shape, device=dna1.device)<self.p
+        dna[mask] = dna2[mask]
+        return dna
+    
+    
+class ElementwiseLinearBreeder(Breeder):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.weights = nn.Parameter(torch.zeros(2))
+        
+    def forward(self, x):
+        return (x*self.weights.softmax(dim=-1)).sum(dim=-1)
+    
+    def breed_dna(self, dna1, dna2):
+        return self(torch.stack([dna1, dna2], dim=-1))
+    
+class ElementwiseNonlinearBreeder(Breeder):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.seq = nn.Sequential(nn.Linear(2, 10),
+                                    nn.ReLU(),
+                                    nn.Linear(10, 1),)
+        
+    def forward(self, x):
+        return self.seq(x)[..., 0]
+    
+    def breed_dna(self, dna1, dna2):
+        return self(torch.stack([dna1, dna2], dim=-1))
+    
+class ElementwiseNonsharedLinearBreeder(Breeder):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.weights = nn.Parameter(torch.zeros(685, 2))
+        
+    def forward(self, x):
+        return (x*self.weights.softmax(dim=-1)).sum(dim=-1)
+    
+    def breed_dna(self, dna1, dna2):
+        return self(torch.stack([dna1, dna2], dim=-1))
