@@ -22,6 +22,12 @@ def perturb_type2(a, prob, rgn=torch.randn):
     a[mask] = 1e-1*rgn(mask.sum()).to(a)
     return a
 
+def perturb_type3(a, prob, rgn=torch.randn):
+    a = a.clone()
+    mask = torch.rand_like(a)<prob
+#     a[mask] = 1e-1*torch.randn_like(a)[mask]
+    a[mask] = ~a[mask]
+    return a
 
 def model2vec(model, device='cpu'):
     p = model.parameters()
