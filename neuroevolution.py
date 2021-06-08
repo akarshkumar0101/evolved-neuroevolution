@@ -9,33 +9,35 @@ import ga
 import genotype
 
 class Neuroevolution(ga.SimpleGA):
-    def __init__(self, geno_config, evol_config, device='cpu', verbose=False, logger=None, tag=None):
+    def __init__(self, geno_cfg, evol_cfg, device='cpu', verbose=False, logger=None, tag=None):
         self.logger = logger
         self.tag = tag
         
-        
-        super().__init__(self.calc_ipop, self.calc_clone, self.calc_mutate, 
-                         self.calc_crossover, **evol_config)
-        
-        self.geno_config = geno_config
-        self.evol_config = evol_config
+        self.geno_cfg = geno_cfg
+        self.evol_cfg = evol_cfg
         self.device = device
         
-        pheno = self.geno_config['pheno_class'](**self.geno_config).to(self.device)
-        pwl = len(util.model2vec(pheno))
-        geno_config['pheno_weight_len'] = pwl
-        decoder = self.geno_config['decoder_class'](**self.geno_config).to(self.device)
-        breeder = self.geno_config['breeder_class'](**self.geno_config).to(self.device)
-        dwl = len(util.model2vec(decoder))
-        bwl = len(util.model2vec(breeder))
-        if geno_config['decoder_class'] is models_decode.IdentityDecoder:
-            geno_config['dna_len'] = geno_config['pheno_weight_len']
-        dna_len = geno_config['dna_len']
+        super().__init__(self.calc_ipop, self.calc_clone, self.calc_mutate, 
+                         self.calc_crossover, 
+                         fit2prob_cfg=self.evol_cfg['fit2prob_cfg'],
+                         select_cfg=self.evol_cfg['select_cfg'])
+        
+        
+        self.pheno = self.geno_cfg['pheno_class'](**self.geno_cfg).to(self.device)
+        pwl = len(util.model2vec(self.pheno))
+        geno_cfg['pheno_weight_len'] = pwl
+        self.decoder = self.geno_cfg['decoder_class'](**self.geno_cfg).to(self.device)
+        self.breeder = self.geno_cfg['breeder_class'](**self.geno_cfg).to(self.device)
+        dwl = len(util.model2vec(self.decoder))
+        bwl = len(util.model2vec(self.breeder))
+        if geno_cfg['decoder_class'] is models_decode.IdentityDecoder:
+            geno_cfg['dna_len'] = geno_cfg['pheno_weight_len']
+        dna_len = geno_cfg['dna_len']
             
         if verbose:
             print('Running Neuroevolution with ')
-            print('Population: ', evol_config['n_pop'])
-            print('Generations: ', evol_config['n_gen'])
+            print('Population: ', evol_cfg['n_pop'])
+            print('Generations: ', evol_cfg['n_gen'])
             print(f'Pheno   # params: {pwl:05d}')
             print('------------------')
             print(f'DNA     # params: {dna_len:05d}')
@@ -44,35 +46,27 @@ class Neuroevolution(ga.SimpleGA):
             print(f'Total   # params: {dna_len+dwl+bwl:5d}')
         
     def calc_ipop(self):
-        return np.array([genotype.GenotypeCombined.generate_random(device=self.device, **self.geno_config)
-                         for _ in range(self.evol_config['n_pop'])])
+        return np.array([genotype.GenotypeCombined.generate_random(device=self.device, **self.geno_cfg)
+                         for _ in range(self.evol_cfg['n_pop'])])
         
     def calc_clone(self, pop):
         return np.array([geno.clone() for geno in pop])
 
     def calc_mutate(self, pop):
-        return np.array([geno.mutate(**self.geno_config) for geno in pop])
+        return np.array([geno.mutate(**self.geno_cfg) for geno in pop])
     
     def calc_crossover(self, pop1, pop2):
-        _, _, breeder = self.init_pheno_decoder_breeder()
-        return np.array([geno1.crossover(geno2, breeder=breeder) for geno1, geno2 in zip(pop1, pop2)])
-    
-    def init_pheno_decoder_breeder(self):
-        pheno = self.geno_config['pheno_class'](**self.geno_config).to(self.device)
-        decoder = self.geno_config['decoder_class'](**self.geno_config).to(self.device)
-        breeder = self.geno_config['breeder_class'](**self.geno_config).to(self.device)
-        return pheno, decoder, breeder
+        return np.array([geno1.crossover(geno2, breeder=self.breeder) for geno1, geno2 in zip(pop1, pop2)])
     
     def calc_fitdata(self, pop):
         fitdata = []
-        pheno, decoder, _ = self.init_pheno_decoder_breeder()
         for geno in pop:
-            pheno = geno.load_pheno(decoder, pheno)
-            fitdata.append(self.evol_config['fitness_func'](pheno, device=self.device))
+            pheno = geno.load_pheno(self.decoder, self.pheno)
+            fitdata.append(self.evol_cfg['fitness_func'](pheno, device=self.device))
         return np.array(fitdata)
     
     def run_evolution(self, tqdm=None):
-        super().run_evolution(self.evol_config['n_gen'], self.calc_fitdata, 
+        super().run_evolution(self.evol_cfg['n_gen'], self.calc_fitdata, 
                               tqdm=tqdm, fn_callback=self.log_stats)
         
     def log_stats(self):
@@ -85,7 +79,7 @@ class Neuroevolution(ga.SimpleGA):
         logger.add_scalar(f'{tag}/gpu_mem_allocated', torch.cuda.memory_allocated(), global_step=gen_idx)
         if gen_idx==1:
             self.fitdata_gens = []
-            torch.save(self.geno_config, os.path.join(logger.log_dir, 'geno_config'))
+            torch.save(self.geno_cfg, os.path.join(logger.log_dir, 'geno_cfg'))
         
 #         fitdata = util.arr_dict2dict_arr(np.array([g.fitdata for g in self.pop_breeder]))
         fd_AD = self.fitdata
