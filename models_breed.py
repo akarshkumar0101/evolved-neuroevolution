@@ -86,7 +86,7 @@ class RandomSwapBreeder(Breeder):
         
     def breed_dna(self, dna1, dna2):
         dna = dna1.clone()
-        mask = torch.rand(size=dna.shape, device=dna1.device)<self.p
+        mask = torch.rand_like(dna)<self.p
         dna[mask] = dna2[mask]
         return dna
     
@@ -152,3 +152,70 @@ class ConvBreeder(Breeder):
     
     def breed_dna(self, dna1, dna2):
         return self(torch.stack([dna1, dna2], dim=-2)[None])[0]
+    
+class ConvRSBProbBreeder(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+
+        self.seq = nn.Sequential(*[
+            nn.Conv1d(2, 4, 5, padding=2),
+            nn.ReLU(),
+#             nn.MaxPool1d(2),
+            nn.Conv1d(4, 4, 5, padding=2),
+            nn.ReLU(),
+#             nn.MaxPool1d(2),
+            nn.Conv1d(4, 4, 5, padding=2),
+            nn.ReLU(),
+#             nn.MaxPool1d(3),
+            nn.Conv1d(4, 1, 5, padding=2),
+#             nn.MaxPool1d(1),
+            nn.Tanh(),
+        ])
+        
+    def forward(self, x):
+        x = self.seq(x)[:, 0]
+        return x
+    
+    def breed_dna(self, dna1, dna2):
+        p = self(torch.stack([dna1, dna2], dim=-2)[None])[0]
+        dna = dna1.clone()
+        mask = torch.rand_like(p)<p
+        dna[mask] = dna2[mask]
+        
+        return dna
+    
+class ConvRSBProbBreeder(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+
+        self.seq = nn.Sequential(*[
+            nn.Conv1d(2, 4, 5, padding=2),
+            nn.ReLU(),
+#             nn.MaxPool1d(2),
+            nn.Conv1d(4, 4, 5, padding=2),
+            nn.ReLU(),
+#             nn.MaxPool1d(2),
+            nn.Conv1d(4, 4, 5, padding=2),
+            nn.ReLU(),
+#             nn.MaxPool1d(3),
+            nn.Conv1d(4, 1, 5, padding=2),
+#             nn.MaxPool1d(1),
+            nn.Sigmoid(),
+        ])
+        if kwargs['breeder_init_zeros']:
+            for mod in self.modules():
+                if type(mod) is nn.Conv1d:
+                    mod.weight.data = torch.zeros_like(mod.weight)
+                    mod.bias.data = torch.zeros_like(mod.bias)
+        
+    def forward(self, x):
+        x = self.seq(x)[:, 0]
+        return x
+    
+    def breed_dna(self, dna1, dna2):
+        p = self(torch.stack([dna1, dna2], dim=-2)[None])[0]
+        dna = dna1.clone()
+        mask = torch.rand_like(p)<p
+        dna[mask] = dna2[mask]
+        
+        return dna
