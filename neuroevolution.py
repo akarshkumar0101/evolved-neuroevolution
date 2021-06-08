@@ -5,17 +5,21 @@ from torch import nn
 
 import util
 import models_decode
-import population
+import ga
 import genotype
 
-class Neuroevolution:
-    def __init__(self, geno_config, evol_config, device='cpu', verbose=False):
+class Neuroevolution(ga.SimpleGA):
+    def __init__(self, geno_config, evol_config, device='cpu', verbose=False, logger=None, tag=None):
+        self.logger = logger
+        self.tag = tag
+        
+        
+        super().__init__(self.calc_ipop, self.calc_clone, self.calc_mutate, 
+                         self.calc_crossover, **evol_config)
+        
         self.geno_config = geno_config
         self.evol_config = evol_config
         self.device = device
-        
-        self.best_fitness_ever_seen = None
-        self.fitness_v_gen_AUC = 0
         
         pheno = self.geno_config['pheno_class'](**self.geno_config).to(self.device)
         pwl = len(util.model2vec(pheno))
@@ -39,21 +43,25 @@ class Neuroevolution:
             print(f'Breeder # params: {bwl:05d}')
             print(f'Total   # params: {dna_len+dwl+bwl:5d}')
         
+    def calc_ipop(self):
+        return np.array([genotype.GenotypeCombined.generate_random(device=self.device, **self.geno_config)
+                         for _ in range(self.evol_config['n_pop'])])
+        
     def calc_clone(self, pop):
         return np.array([geno.clone() for geno in pop])
 
     def calc_mutate(self, pop):
         return np.array([geno.mutate(**self.geno_config) for geno in pop])
     
+    def calc_crossover(self, pop1, pop2):
+        _, _, breeder = self.init_pheno_decoder_breeder()
+        return np.array([geno1.crossover(geno2, breeder=breeder) for geno1, geno2 in zip(pop1, pop2)])
+    
     def init_pheno_decoder_breeder(self):
         pheno = self.geno_config['pheno_class'](**self.geno_config).to(self.device)
         decoder = self.geno_config['decoder_class'](**self.geno_config).to(self.device)
         breeder = self.geno_config['breeder_class'](**self.geno_config).to(self.device)
         return pheno, decoder, breeder
-
-    def calc_crossover(self, pop1, pop2):
-        _, _, breeder = self.init_pheno_decoder_breeder()
-        return np.array([geno1.crossover(geno2, breeder=breeder) for geno1, geno2 in zip(pop1, pop2)])
     
     def calc_fitdata(self, pop):
         fitdata = []
@@ -63,30 +71,19 @@ class Neuroevolution:
             fitdata.append(self.evol_config['fitness_func'](pheno, device=self.device))
         return np.array(fitdata)
     
-    def run_evolution(self, tqdm=None, logger=None, tag=None):
-        self.npop = np.array([genotype.GenotypeCombined.generate_random(device=self.device, **self.geno_config) 
-                              for _ in range(self.evol_config['n_pop'])])
+    def run_evolution(self, tqdm=None):
+        super().run_evolution(self.evol_config['n_gen'], self.calc_fitdata, 
+                              tqdm=tqdm, fn_callback=self.log_stats)
         
-        loop = range(self.evol_config['n_gen'])
-        if tqdm is not None:
-            loop = tqdm(loop)
-        for gen_idx in loop:
-            self.pop = self.npop
-            self.fitdata = self.calc_fitdata(self.pop)
-            
-            self.prob = population.fit2prob_sm(util.arr_dict2dict_arr(self.fitdata)['fitness'],
-                                               **self.evol_config)
-            self.npop = population.calc_next_population(self.pop, self.prob, 
-                                                        self.calc_clone, self.calc_mutate, 
-                                                        self.calc_crossover, **self.evol_config)
-            loop.set_postfix({'fitness': np.max(util.arr_dict2dict_arr(self.fitdata)['fitness'])})
-            
-            if logger is not None:
-                self.log_stats(gen_idx, logger, tag)
-
-    def log_stats(self, gen_idx, logger, tag=None):
+    def log_stats(self):
+        gen_idx = self.gen_idx
+        logger = self.logger
+        tag = self.tag
+        if logger is None:
+            return
+        
         logger.add_scalar(f'{tag}/gpu_mem_allocated', torch.cuda.memory_allocated(), global_step=gen_idx)
-        if gen_idx==0:
+        if gen_idx==1:
             self.fitdata_gens = []
             torch.save(self.geno_config, os.path.join(logger.log_dir, 'geno_config'))
         
@@ -140,6 +137,8 @@ class Neuroevolution:
     #         plt.imshow()
     #         plt.colorbar()
     #         logger.add_figure('similarity', plt.gcf(), global_step=gen_idx)
+    
+    
     
     
     
