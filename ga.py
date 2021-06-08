@@ -4,15 +4,15 @@ import torch
 import util
 
 def fit2prob_sm(fitnesses, **kwargs):
-    prob_sm_const = kwargs['fit2prob_sm_iT']
+    prob_sm_const = kwargs['inv_temp']
     prob = torch.from_numpy(fitnesses)
-    if kwargs['fit2prob_sm_normalize'] and prob.std().abs().item()>1e-3:
+    if kwargs['normalize'] and prob.std().abs().item()>1e-3:
         prob = prob/prob.std()
     prob = (prob_sm_const*prob).softmax(dim=-1).numpy()
     return prob
 
 def calc_npop_roulette(pop, prob, calc_clone, calc_mutate, calc_crossover=None, **kwargs):
-    k_elite, do_crossover, with_replace = kwargs['select_k_elite'], kwargs['select_do_crossover'], kwargs['select_with_replacement']
+    k_elite, do_crossover, with_replace = kwargs['k_elite'], kwargs['do_crossover'], kwargs['with_replacement']
     
     npop = []
     n_elite_idxs = np.argsort(prob)[::-1][:k_elite]
@@ -70,7 +70,7 @@ def calc_npop_top_K(pop, prob, calc_clone, calc_mutate, calc_crossover=None, **k
 
 class SimpleGA:
     def __init__(self, calc_ipop=None, calc_clone=None, calc_mutate=None, calc_crossover=None, 
-                 calc_npop=calc_npop_roulette, fit2prob=fit2prob_sm, **evol_config):
+                 calc_npop=calc_npop_roulette, fit2prob=fit2prob_sm, fit2prob_cfg=None, select_cfg=None):
         self.gen_idx = 0
         
         self.calc_ipop = calc_ipop
@@ -81,7 +81,8 @@ class SimpleGA:
         self.calc_npop = calc_npop
         self.fit2prob = fit2prob_sm
         
-        self.evol_config = evol_config
+        self.fit2prob_cfg = fit2prob_cfg
+        self.select_cfg = select_cfg
     
     def ask(self):
         if self.gen_idx==0:
@@ -94,9 +95,9 @@ class SimpleGA:
         for geno, fd in zip(self.pop, self.fitdata):
             geno.fitdata = fd
         self.fitdata_DA = util.arr_dict2dict_arr(self.fitdata)
-        self.prob = self.fit2prob(self.fitdata_DA['fitness'], **self.evol_config)
+        self.prob = self.fit2prob(self.fitdata_DA['fitness'], **self.fit2prob_cfg)
         self.npop = self.calc_npop(self.pop, self.prob, self.calc_clone, self.calc_mutate, 
-                                   self.calc_crossover, **self.evol_config)
+                                   self.calc_crossover, **self.select_cfg)
         self.gen_idx += 1
         
     def run_evolution(self, n_gens, calc_fitdata, tqdm=None, fn_callback=None):
