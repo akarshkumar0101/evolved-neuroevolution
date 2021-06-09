@@ -56,7 +56,7 @@ class MNIST:
         return {'loss': loss_total, 'accuracy': accuracy}
 
 
-    def calc_pheo_fitness(self, pheno, n_sample=2000, device='cpu', ds='train'):
+    def calc_pheo_fitness(self, pheno, n_sample=5000, device='cpu', ds='train'):
         if ds=='train':
             X, Y = self.X_train, self.Y_train
         else:
