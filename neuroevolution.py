@@ -26,13 +26,13 @@ class Neuroevolution(ga.SimpleGA):
         self.pheno = self.geno_cfg['pheno_class'](**self.geno_cfg).to(self.device)
         pwl = len(util.model2vec(self.pheno))
         geno_cfg['pheno_weight_len'] = pwl
-        self.decoder = self.geno_cfg['decoder_class'](**self.geno_cfg).to(self.device)
-        self.breeder = self.geno_cfg['breeder_class'](**self.geno_cfg).to(self.device)
-        dwl = len(util.model2vec(self.decoder))
-        bwl = len(util.model2vec(self.breeder))
         if geno_cfg['decoder_class'] is models_decode.IdentityDecoder:
             geno_cfg['dna_len'] = geno_cfg['pheno_weight_len']
         dna_len = geno_cfg['dna_len']
+        self.decoder = self.geno_cfg['decoder_class'](**self.geno_cfg).to(self.device)
+        dwl = len(util.model2vec(self.decoder))
+        self.breeder = self.geno_cfg['breeder_class'](**self.geno_cfg).to(self.device)
+        bwl = len(util.model2vec(self.breeder))
             
         if verbose:
             print('Running Neuroevolution with ')
