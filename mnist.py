@@ -45,7 +45,7 @@ class MNIST:
                 break
             Y_batch_pred = net(X_batch)
             n_correct += (Y_batch_pred.argmax(dim=-1)==Y_batch).sum().item()
-            loss = self.loss_func(Y_batch_pred.log(), Y_batch).item()
+            loss = self.loss_func(Y_batch_pred, Y_batch).item()
             loss_total += loss * len(X_batch)
             n_examples += len(X_batch)
             total += len(Y_batch)
@@ -70,7 +70,7 @@ class MNIST:
 
         Y_batch_pred = pheno(X_batch)
         n_correct = (Y_batch_pred.argmax(dim=-1)==Y_batch).sum().item()
-        loss = self.loss_func(Y_batch_pred.log(), Y_batch).item()
+        loss = self.loss_func(Y_batch_pred, Y_batch).item()
     #     if not np.isfinite(loss):
     #         loss = 10.
         accuracy = n_correct/len(Y_batch)*100.
