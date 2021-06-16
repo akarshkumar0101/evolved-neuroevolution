@@ -2,7 +2,6 @@ import numpy as np
 import torch
 from torch import nn
 
-
 def to_np_obj_array(a):
     """
     Takes in a list/iterable of stuff and turns it into a numpy object array.
@@ -74,3 +73,17 @@ def arr_dict_mean(AD, axis=-1):
 
 def dict_arr_mean(DA, axis=-1):
     return {key:DA[key].mean(axis=axis) for key in DA.keys()}
+
+def calc_pairwise_cossim(d1, d2=None):
+    if d2 is None:
+        d2 = d1
+    d1, d2 = d1[None], d2[:, None]
+    return torch.cosine_similarity(d1, d2, dim=-1)
+    
+def calc_pairwise_corr(d1, d2=None):
+    if d2 is None:
+        d2 = d1
+    d1, d2 = d1[None], d2[:, None]
+    d1, d2 = d1-d1.mean(dim=-1, keepdim=True), d2-d2.mean(dim=-1, keepdim=True)
+    return (d1*d2).sum(dim=-1)/torch.sqrt(d1.pow(2.).sum(dim=-1)*d2.pow(2.).sum(dim=-1))
+    

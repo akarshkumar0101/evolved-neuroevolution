@@ -107,6 +107,13 @@ class SimpleGA:
             
         for gen_idx in loop:
             fitdata = calc_fitdata(self.ask())
+            
+            if False:
+                data = torch.stack([g.geno_dna.dna for g in self.pop])
+                data = util.calc_pairwise_corr(data).mean(dim=0).detach().cpu().numpy()
+                for fd, sim in zip(fitdata, data):
+                    fd['fitness'] -= sim/10.
+
             self.tell(fitdata)
             
             if tqdm is not None:

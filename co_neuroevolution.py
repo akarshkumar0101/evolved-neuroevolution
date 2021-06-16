@@ -81,7 +81,8 @@ class Neuroevolution:
         fitdata = []
         for geno in pop:
             for geno_decoder in np.random.choice(self.ga_decoder.pop, size=n_sample, replace=False):
-                pheno = geno_decoder.load_pheno(geno, self.decoder, self.pheno)
+#                 pheno = geno_decoder.load_pheno(geno, self.decoder, self.pheno)
+                pheno = geno.load_pheno(geno_decoder, self.decoder, self.pheno)
                 fitdata.append(self.evol_cfg['fitness_func'](pheno, device=self.device))
         return util.arr_dict_mean(np.array(fitdata).reshape((len(pop), n_sample)), axis=-1) 
         
@@ -93,7 +94,8 @@ class Neuroevolution:
         fitdata = []
         for geno_decoder in pop_decoder:
             for geno in np.random.choice(self.ga.pop, size=n_sample, replace=False):
-                pheno = geno_decoder.load_pheno(geno, self.decoder, self.pheno)
+#                 pheno = geno_decoder.load_pheno(geno, self.decoder, self.pheno)
+                pheno = geno.load_pheno(geno_decoder, self.decoder, self.pheno)
                 fitdata.append(self.evol_cfg['fitness_func'](pheno, device=self.device))
         return util.arr_dict_mean(np.array(fitdata).reshape((len(pop_decoder), n_sample)), axis=-1) 
     
@@ -107,7 +109,8 @@ class Neuroevolution:
             for geno1, geno2 in np.random.choice(self.ga.pop, size=(n_sample, 2), replace=True):
                 geno_decoder = np.random.choice(self.ga_decoder.pop)
                 geno = geno1.crossover(geno2, geno_breeder, self.breeder)
-                pheno = geno_decoder.load_pheno(geno, self.decoder, self.pheno)
+#                 pheno = geno_decoder.load_pheno(geno, self.decoder, self.pheno)
+                pheno = geno.load_pheno(geno_decoder, self.decoder, self.pheno)
                 fd = self.evol_cfg['fitness_func'](pheno, device=self.device)
                 fd = {key: fd[key]-(geno1.fitdata[key]+geno2.fitdata[key])/2. for key in fd.keys()}
                 fitdata.append(fd)

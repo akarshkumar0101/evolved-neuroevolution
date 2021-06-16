@@ -4,17 +4,25 @@ import util
 
 class Genotype():
     id_factory = {}
-    def __init__(self, genos_parent=None, origin_type=None):
-        if self.__class__ not in Genotype.id_factory:
-            Genotype.id_factory[self.__class__] = 0
-        self.id = Genotype.id_factory[self.__class__]
-        Genotype.id_factory[self.__class__] += 1
-        
-        if genos_parent is not None:
-            self.parents_id = [geno.id for geno in genos_parent]
-        else:
-            self.parents_id =[]
-        self.origin_type = origin_type
+    def __init__(self, genos_parent=None, origin_type=None, empty=False):
+        if not empty:
+            if self.__class__ not in Genotype.id_factory:
+                Genotype.id_factory[self.__class__] = 0
+            self.id = Genotype.id_factory[self.__class__]
+            Genotype.id_factory[self.__class__] += 1
+
+            if genos_parent is not None:
+                self.parents_id = [geno.id for geno in genos_parent]
+            else:
+                self.parents_id =[]
+            self.origin_type = origin_type
+    
+    def empty_copy(self):
+        geno = Genotype(empty=True)
+        geno.id = self.id
+        geno.parents_id = self.parents_id
+        geno.origin_type = self.origin_type
+        return geno
         
 class GenotypeContinuousMaskedDNA(Genotype):
     def __init__(self, weights=None, mask=None, genos_parent=None, origin_type=None):
@@ -94,6 +102,12 @@ class GenotypeContinuousDNA(Genotype):
         dna = breeder.breed_dna(self.dna, geno2.dna)
         return GenotypeContinuousDNA(dna, [self, geno2], 'breed')
     
+    def load_pheno(self, geno_decoder, decoder, pheno):
+        decoder = geno_decoder.load_decoder(decoder)
+        pheno_weights = decoder.decode_dna(self.dna)
+        pheno = util.vec2model(pheno_weights, pheno)
+        return pheno
+    
 class GenotypeDecoderWeights(Genotype):
     def __init__(self, weights=None, genos_parent=None, origin_type=None):
         super().__init__(genos_parent, origin_type)
@@ -120,11 +134,9 @@ class GenotypeDecoderWeights(Genotype):
             weights = util.perturb_type2(weights, kwargs['decode_mutate_prob']).detach()
         return GenotypeDecoderWeights(weights, [self], 'mutate')
     
-    def load_pheno(self, geno_dna, decoder, pheno):
-        decoder = util.vec2model(self.weights, decoder)
-        pheno_dna = decoder.decode_dna(geno_dna.dna)
-        pheno = util.vec2model(pheno_dna, pheno)
-        return pheno
+    def load_decoder(self, decoder):
+        return util.vec2model(self.weights, decoder)
+    
     
 class GenotypeBreederWeights(Genotype):
     def __init__(self, weights=None, genos_parent=None, origin_type=None):
@@ -152,8 +164,7 @@ class GenotypeBreederWeights(Genotype):
         return GenotypeBreederWeights(weights, [self], 'mutate')
     
     def load_breeder(self, breeder):
-        breeder = util.vec2model(self.weights, breeder)
-        return breeder
+        return util.vec2model(self.weights, breeder)
     
 class GenotypeCombined(Genotype):
     def __init__(self, geno_dna, geno_decoder=None, geno_breeder=None, 
@@ -194,5 +205,5 @@ class GenotypeCombined(Genotype):
         return GenotypeCombined(geno_dna, self.geno_decoder, self.geno_breeder, [self, geno2], 'breed')
         
     def load_pheno(self, decoder, pheno):
-        return self.geno_decoder.load_pheno(self.geno_dna, decoder, pheno)
+        return self.geno_dna.load_pheno(self.geno_decoder, decoder, pheno)
     

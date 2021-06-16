@@ -9,9 +9,8 @@ import ga
 import genotype
 
 class Neuroevolution(ga.SimpleGA):
-    def __init__(self, geno_cfg, evol_cfg, device='cpu', verbose=False, logger=None, tag=None):
-        self.logger = logger
-        self.tag = tag
+    def __init__(self, geno_cfg, evol_cfg, log_cfg, device='cpu', verbose=False):
+        self.log_cfg = log_cfg
         
         self.geno_cfg = geno_cfg
         self.evol_cfg = evol_cfg
@@ -70,15 +69,18 @@ class Neuroevolution(ga.SimpleGA):
                               tqdm=tqdm, fn_callback=self.log_stats)
         
     def log_stats(self):
-        gen_idx = self.gen_idx
-        logger = self.logger
-        tag = self.tag
+        logger, tag, gen_idx = self.log_cfg['logger'], self.log_cfg['tag'], self.gen_idx
         if logger is None:
             return
         
         logger.add_scalar(f'{tag}/gpu_mem_allocated', torch.cuda.memory_allocated(), global_step=gen_idx)
         if gen_idx==1:
+            save_n_gens = self.log_cfg['save_n_gens']
+            self.gens_save = np.concatenate([np.arange(10), 
+                                             np.linspace(10, self.evol_cfg['n_gen'], save_n_gens-10, 
+                                                         endpoint=False)]).astype(int)
             self.fitdata_gens = []
+            self.pop_evol = {}
             torch.save(self.geno_cfg, os.path.join(logger.log_dir, 'geno_cfg'))
         
 #         fitdata = util.arr_dict2dict_arr(np.array([g.fitdata for g in self.pop_breeder]))
@@ -93,6 +95,12 @@ class Neuroevolution(ga.SimpleGA):
     
         d = {f'{tag}/best': np.max(fd_DA['fitness']), f'{tag}/worst': np.max(fd_DA['fitness'])}
         logger.add_scalars(f'fitnesses', d, global_step=gen_idx)
+        
+        if gen_idx in self.gens_save:
+            save_n_agents = self.log_cfg['save_n_agents']
+            i = np.argsort(fd_DA['fitness'])[-save_n_agents:]
+            self.pop_evol[gen_idx] = self.pop[i]
+            
                 
 #         for key, value in self.fitdata.items():
 #             data = np.array(value)
@@ -121,8 +129,7 @@ class Neuroevolution(ga.SimpleGA):
 #                             'median': np.median(fitnesses['nll']),
 #                             'min': np.min(fitnesses['nll']),
 #                            }, global_step=gen_idx)
-        if gen_idx%1==0:
-            pass
+#         if gen_idx%1==0:
 #             plt.bar(np.arange(len(prob)), np.sort(np.array(prob)))
 #             plt.show()
 #                     a = torch.stack(list(population))

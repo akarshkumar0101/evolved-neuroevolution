@@ -55,7 +55,8 @@ class MNIST:
             print(f'Average Loss: {loss_total:.03f}, Accuracy: {accuracy:.03f}%')
         return {'loss': loss_total, 'accuracy': accuracy}
 
-
+    # TODO: do not use .item() anywhere and rather just accumulate gpu tensor data.
+    # transferring from gpu mem to cpu mem takes FOREVER in clock time
     def calc_pheo_fitness(self, pheno, n_sample=5000, device='cpu', ds='train'):
         if ds=='train':
             X, Y = self.X_train, self.Y_train
@@ -69,10 +70,8 @@ class MNIST:
         X_batch, Y_batch = X[idx].to(device), Y[idx].to(device)
 
         Y_batch_pred = pheno(X_batch)
-        n_correct = (Y_batch_pred.argmax(dim=-1)==Y_batch).sum().item()
         loss = self.loss_func(Y_batch_pred, Y_batch).item()
-    #     if not np.isfinite(loss):
-    #         loss = 10.
+        n_correct = (Y_batch_pred.argmax(dim=-1)==Y_batch).sum().item()
         accuracy = n_correct/len(Y_batch)*100.
         return {'fitness': -loss, 'loss': loss, 'accuracy': accuracy}
 
