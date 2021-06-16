@@ -68,6 +68,9 @@ class Neuroevolution(ga.SimpleGA):
         super().run_evolution(self.evol_cfg['n_gen'], self.calc_fitdata, 
                               tqdm=tqdm, fn_callback=self.log_stats)
         
+        self.fitdata_gens = np.array(self.fitdata_gens)
+        self.fitdata_gens_DA = util.arr_dict2dict_arr(self.fitdata_gens)
+        
     def log_stats(self):
         logger, tag, gen_idx = self.log_cfg['logger'], self.log_cfg['tag'], self.gen_idx
         if logger is None:

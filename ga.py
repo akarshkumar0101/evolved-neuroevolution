@@ -4,19 +4,25 @@ import torch
 import util
 
 def fit2prob_sm(fitnesses, **kwargs):
-    prob_sm_const = kwargs['inv_temp']
+    temp = kwargs['temperature']
     prob = torch.from_numpy(fitnesses)
     if kwargs['normalize'] and prob.std().abs().item()>1e-3:
         prob = prob/prob.std()
-    prob = (prob_sm_const*prob).softmax(dim=-1).numpy()
+    prob = (prob/temp).softmax(dim=-1).numpy()
     return prob
 
 def calc_npop_roulette(pop, prob, calc_clone, calc_mutate, calc_crossover=None, **kwargs):
-    k_elite, do_crossover, with_replace = kwargs['k_elite'], kwargs['do_crossover'], kwargs['with_replacement']
+    k_elite = kwargs['k_elite']
+    do_crossover = kwargs['do_crossover']
+    with_replace = kwargs['with_replacement']
     
     npop = []
-    n_elite_idxs = np.argsort(prob)[::-1][:k_elite]
-    npop.extend(calc_clone(pop[n_elite_idxs]))
+    idxs_sort = np.argsort(prob)
+    idxs_elite = idxs_sort[-k_elite:]
+    idxs_bum = idxs_sort[:-k_elite]
+    npop.extend(calc_clone(pop[idxs_elite]))
+    
+#     pop = pop[bum_idxs]
 
     n_children = len(pop)-len(npop)
     if do_crossover:
@@ -32,10 +38,12 @@ def calc_npop_roulette(pop, prob, calc_clone, calc_mutate, calc_crossover=None, 
     npop.extend(children)
     return np.array(npop)
 
-# TODO finish this method...
 def calc_npop_tournament(pop, prob, calc_clone, calc_mutate, calc_crossover=None, **kwargs):
-    k_elite, do_crossover, with_replace, k_tourn = kwargs['select_k_elite'], \
-    kwargs['select_crossover'], kwargs['select_with_replacement'], kwargs['select_k_tournament']
+    k_elite = kwargs['k_elite']
+    do_crossover = kwargs['do_crossover']
+    with_replace = kwargs['with_replacement']
+    
+    k_tourn = kwargs['k_tournament']
 
     npop = []
     n_elite_idxs = np.argsort(prob)[::-1][:k_elite]

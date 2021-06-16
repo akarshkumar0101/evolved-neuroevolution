@@ -3,20 +3,26 @@ import matplotlib.pyplot as plt
 
 import util
 from tqdm import tqdm
+import random
 
-def plot_generation_fitnesses(y, x=None, show_dist=True, c=None, label=None):
+def plot_fits_vs_gens(y, x=None, show_error=True, c=None, label=None):
     """
     `y` should be of shape (time points, num samples)
     """
     if x is None:
         x = np.arange(len(y))
+        
+    if c is None:
+        c = [random.random() for _ in range(3)]
+        
     y_avg, y_std = y.mean(axis=-1), y.std(axis=-1)
     y_max, y_min = y.max(axis=-1), y.min(axis=-1)
     
-    if show_dist:
+    if show_error:
         plt.errorbar(x=x, y=(y_max+y_min)/2., yerr=(y_max-y_min)/2., elinewidth=0.5, c=c)
-        plt.plot(x, y_max, c=c)
+    plt.plot(x, y_max, c=c)
     plt.plot(x, y_min, c=c, label=label)
+    plt.xlim(np.min(x), np.max(x))
     
 def to_pheno_mix_breed_decode(ne, decoder_geno, dna1_geno, dna2_geno=None, breeder_geno=None):
     if breeder_geno is None:

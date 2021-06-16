@@ -11,14 +11,13 @@ import shutil
 from torchinfo import summary
 import torch.utils.tensorboard as tb
 
-import models_pheno
-import models_decode
-import models_breed
+import models_pheno, models_decode, models_breed
 import mnist
-import neuroevolution
-import co_neuroevolution
+import neuroevolution, co_neuroevolution
 # import ordinary_ne
 import util
+import ga
+import viz
 
 np.random.seed(0)
 torch.manual_seed(10);
