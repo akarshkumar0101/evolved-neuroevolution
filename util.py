@@ -28,6 +28,23 @@ def perturb_type3(a, prob, rgn=torch.randn):
     a[mask] = ~a[mask]
     return a
 
+def perturb_vec(a, prob, eps, add, rgn=torch.randn):
+    a = a.clone()
+    mask = torch.rand_like(a)<prob
+    noise = eps*rgn(mask.sum(), dtype=a.dtype, device=a.device)
+    if add:
+        a[mask] = a[mask] + noise
+    else:
+        a[mask] = noise
+    return a
+
+def perturb_bool(a, prob):
+    a = a.clone()
+    mask = torch.rand(a.shape, device=a.device, dtype=torch.float32)<prob
+    a[mask] = ~a[mask]
+    return a
+    
+
 def model2vec(model, device='cpu'):
     p = model.parameters()
     n_params = np.sum([pi.numel() for pi in p], dtype=int)

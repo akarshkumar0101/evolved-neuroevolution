@@ -96,7 +96,7 @@ class Neuroevolution(ga.SimpleGA):
 #             data = data[data>=np.median(data)]
             logger.add_histogram(f'{tag}/breeder_{key}', data, global_step=gen_idx)
     
-        d = {f'{tag}/best': np.max(fd_DA['fitness']), f'{tag}/worst': np.max(fd_DA['fitness'])}
+        d = {f'{tag}/best': np.max(fd_DA['fitness']), f'{tag}/worst': np.min(fd_DA['fitness'])}
         logger.add_scalars(f'fitnesses', d, global_step=gen_idx)
         
         if gen_idx in self.gens_save:

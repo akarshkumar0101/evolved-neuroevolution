@@ -31,14 +31,20 @@ class GenotypeContinuousMaskedDNA(Genotype):
         self.mask = mask
     
     def generate_random(**kwargs):
-        pc, device = [kwargs[i] for i in ['pheno_class', 'device']]
+        pc = kwargs['pheno_class']
+        device = kwargs['device']
+#         mask_true = kwargs['mask_true']
+        
         
         dna = util.model2vec(pc(**kwargs)).to(device)
-        mask = torch.zeros_like(dna, dtype=bool)
-        return GenotypeContinuousDNA(dna, None, 'random')
+        if False:
+            mask = torch.ones_like(dna, dtype=bool)
+        else:
+            mask = torch.zeros_like(dna, dtype=bool)
+        return GenotypeContinuousMaskedDNA(dna, mask, None, 'random')
         
     def clone(self):
-        return GenotypeContinuousDNA(self.weights, self.mask, [self], 'clone')
+        return GenotypeContinuousMaskedDNA(self.weights, self.mask, [self], 'clone')
     
     def mutate(self, **kwargs):
         """
@@ -46,20 +52,19 @@ class GenotypeContinuousMaskedDNA(Genotype):
          - a small perturbation to the solution
          - some extreme resets of some dimensions
         """
-        weights = util.perturb_type1(self.weights, kwargs['dna_mutate_lr']).detach()
-        mask = util.perturb_type3(self.mask, kwargs['dna_mutate_prob']).detach()
-        
-        return GenotypeContinuousDNA(weights, mask, [self], 'mutate')
+        weights = util.perturb_vec(self.weights, 1e0, 1e-2, True).detach()
+        mask = util.perturb_bool(self.mask, .03).detach()
+        return GenotypeContinuousMaskedDNA(weights, mask, [self], 'mutate')
     
     def crossover(self, geno2, geno_breeder, breeder):
-        weights = self.weights
-        mask = self.mask
+        weights = self.weights.clone()
+        mask = self.mask.clone()
         
         m = torch.rand_like(weights)<.5
         weights[m] = geno2.weights[m]
-        m = torch.rand_like(mask)<.5
+        m = torch.rand_like(weights)<.5
         mask[m] = geno2.mask[m]
-        return GenotypeContinuousDNA(weights, mask, [self, geno2], 'breed')
+        return GenotypeContinuousMaskedDNA(weights, mask, [self, geno2], 'breed')
     
     def load_pheno(self, pheno):
         w = torch.zeros_like(self.weights)

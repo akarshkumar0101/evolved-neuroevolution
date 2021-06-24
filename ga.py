@@ -22,9 +22,11 @@ def calc_npop_roulette(pop, prob, calc_clone, calc_mutate, calc_crossover=None, 
     idxs_bum = idxs_sort[:-k_elite]
     npop.extend(calc_clone(pop[idxs_elite]))
     
-#     pop = pop[bum_idxs]
-
     n_children = len(pop)-len(npop)
+    
+    pop, prob = pop[idxs_bum], prob[idxs_bum]
+    prob = prob/prob.sum()
+
     if do_crossover:
         parents1 = np.random.choice(pop, size=n_children, 
                                     p=prob, replace=with_replace)
@@ -46,19 +48,33 @@ def calc_npop_tournament(pop, prob, calc_clone, calc_mutate, calc_crossover=None
     k_tourn = kwargs['k_tournament']
 
     npop = []
-    n_elite_idxs = np.argsort(prob)[::-1][:k_elite]
-    npop.extend(calc_clone(pop[n_elite_idxs]))
+    idxs_sort = np.argsort(prob)
+    idxs_elite = idxs_sort[-k_elite:]
+    idxs_bum = idxs_sort[:-k_elite]
+    npop.extend(calc_clone(pop[idxs_elite]))
     
     n_children = len(pop)-len(npop)
+    
+    pop, prob = pop[idxs_bum], prob[idxs_bum]
+    prob = prob/prob.sum()
+    
     if do_crossover:
-        parents1 = np.random.choice(pop, size=n_children, 
-                                    p=prob, replace=with_replace)
-        parents2 = np.random.choice(pop, size=n_children,
-                                    p=prob, replace=with_replace)
+        parents1, parents2 = [], []
+        for child_idx in range(n_children):
+            idxs = np.random.randint(low=0, high=len(pop), size=(2, k_tourn))
+            idxs_idxs_won = prob[idxs].argmax(axis=-1)
+            idx1, idx2 = idxs[np.arange(2), idxs_idxs_won]
+            parents1.append(pop[idx1])
+            parents2.append(pop[idx2])
+        parents1, parents2 = np.array(parents1), np.array(parents2)
         children = calc_crossover(parents1, parents2)
     else:
-        children = np.random.choice(pop, size=n_children, 
-                                    p=prob, replace=with_replace)
+        for child_idx in range(n_children):
+            idxs = np.random.randint(low=0, high=len(pop), size=(2, k_tourn))
+            idxs_idxs_won = prob[idxs].argmax(axis=-1)
+            idx1, idx2 = idxs[np.arange(2), idxs_idxs_won]
+            parents1.append(pop[idx1])
+        children = np.array(parents1)
     children = calc_mutate(children)
     npop.extend(children)
     return np.array(npop)
@@ -126,5 +142,6 @@ class SimpleGA:
             
             if tqdm is not None:
                 loop.set_postfix({'fitness': np.max(self.fitdata_DA['fitness'])})
-            fn_callback()
+            if fn_callback is not None:
+                fn_callback()
         

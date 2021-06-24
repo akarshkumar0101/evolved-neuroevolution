@@ -4,7 +4,7 @@ import cma
 
 import util
 
-def run_cmaes(model, fitness_func, n_gen, device=None, tqdm=None):
+def run_cmaes(model, fitness_func, n_gen, n_pop, device=None, tqdm=None):
     net = model().to(device)
 
     def fitness_wrapper(sol, net=net):
@@ -14,7 +14,7 @@ def run_cmaes(model, fitness_func, n_gen, device=None, tqdm=None):
         return fitdata
 
     sol = util.model2vec(net).detach().cpu().numpy()
-    es = cma.CMAEvolutionStrategy(sol, 1e-1, {'popsize':100})
+    es = cma.CMAEvolutionStrategy(sol, 1e-1, {'popsize':n_pop})
     # es.optimize(pheno_fitness)
     fitdata_gens = []
     loop = range(n_gen)
