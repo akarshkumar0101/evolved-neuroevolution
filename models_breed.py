@@ -76,7 +76,7 @@ class AverageBreeder(Breeder):
     def breed_dna(self, dna1, dna2):
         return self(torch.stack([dna1, dna2], dim=-1))
     
-class RandomSwapBreeder(Breeder):
+class UniformBreeder(Breeder):
     def __init__(self, **kwargs):
         super().__init__()
         if 'breeder_swap_prob' in kwargs:
@@ -188,8 +188,6 @@ class ConvRSBProbBreeder(nn.Module):
         dna[mask] = dna2[mask]
         
         return dna
-    
-    
     
 class ConvAdvancedRSBBreeder(nn.Module):
     def __init__(self, **kwargs):

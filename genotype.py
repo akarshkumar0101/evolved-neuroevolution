@@ -212,3 +212,62 @@ class GenotypeCombined(Genotype):
     def load_pheno(self, decoder, pheno):
         return self.geno_dna.load_pheno(self.geno_decoder, decoder, pheno)
     
+
+class Genotype():
+    def __init__(self, **kwargs):
+        self.pheno_weights = kwargs['pheno_weights']
+#         self.decoder_weights = kwargs['decoder_weights']
+        self.breeder_weights = kwargs['breeder_weights']
+        self.mutator_weights = kwargs['mutator_weights']
+        
+        self.pheno_class = kwargs['pheno_class']
+        self.breeder_class = kwargs['breeder_class']
+        self.mutator_class = kwargs['mutator_class']
+        self.pheno = kwargs['pheno']
+        self.breeder = kwargs['breeder']
+        self.mutator = kwargs['mutator']
+        
+        self.pwl = len(self.pheno_weights)
+        self.bwl = len(self.breeder_weights)
+        self.mwl = len(self.mutator_weights)
+    
+    def generate_random():
+        self.pheno_weights = self.pheno_weights
+        
+#     def concat_all_weights(self):
+#         return torch.concat([self.pheno_weights, self.breeder_weights, self.mutator_weights])
+        
+#     def deconcat_all_weights(self, all_weights):
+#         pw, bw, mw = all_weights.split([self.pwl, self.bwl, self.mwl])
+#         return pw, bw, mw
+        
+    def crossover(self, another):
+        breeder = util.vec2model(self.breeder_weights, self.breeder)
+        
+        all_weights = self.concat_all_weights()
+        another_all_weights = another.concat_all_weights()
+        
+        child_all_weights = breeder.breed(all_weights, another_all_weights)
+        pw, bw, mw = self.deconcat_all_weights(child_all_weights)
+        
+        child = Genotype(pheno_weights=pw, breeder_weights=bw, mutator_weights=mw, 
+                         pheno_class=self.pheno_class,
+                         breeder_class=self.breeder_class, mutator_class=self.mutator_class,
+                         pheno=self.pheno, breeder=self.breeder, mutator=self.mutator)
+    
+    def mutate(self):
+        mutator = util.vec2model(self.mutator_weights, self.mutator)
+        child_weights = mutator.mutate(self.pheno_weights)
+        
+        all_weights = self.concat_all_weights()
+        another_all_weights = another.concat_all_weights()
+        
+        child_all_weights = breeder.breed(all_weights, another_all_weights)
+        pw, bw, mw = self.deconcat_all_weights(child_all_weights)
+        
+        child = Genotype(pheno_weights=pw, breeder_weights=bw, mutator_weights=mw, 
+                         pheno_class=self.pheno_class,
+                         breeder_class=self.breeder_class, mutator_class=self.mutator_class,
+                         pheno=self.pheno, breeder=self.breeder, mutator=self.mutator)
+        
+     

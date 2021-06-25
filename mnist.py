@@ -10,15 +10,16 @@ class MNIST:
         self.transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
                                                     torchvision.transforms.Normalize((0.1307,), (0.3081,))])
 
-        self.ds_train = torchvision.datasets.MNIST('./', train=True, download=True, transform=self.transform)
-        self.ds_test = torchvision.datasets.MNIST('./', train=False, download=True, transform=self.transform)
+        self.ds_train = torchvision.datasets.MNIST('~/datasets/mnist', train=True, 
+                                                   download=True, transform=self.transform)
+        self.ds_test = torchvision.datasets.MNIST('~/datasets/mnist', train=False, 
+                                                  download=True, transform=self.transform)
         self.bs_train = 1000
         self.bs_test = 3000
         self.loader_train = torch.utils.data.DataLoader(self.ds_train, 
                                                         batch_size=self.bs_train, shuffle=True)
         self.loader_test = torch.utils.data.DataLoader(self.ds_test, 
                                                        batch_size=self.bs_test, shuffle=True)
-        
         self.loss_func = nn.NLLLoss()
 
     def load_all_data(self, device='cpu'):
@@ -57,7 +58,7 @@ class MNIST:
 
     # TODO: do not use .item() anywhere and rather just accumulate gpu tensor data.
     # transferring from gpu mem to cpu mem takes FOREVER in clock time
-    def calc_pheo_fitness(self, pheno, n_sample=5000, device='cpu', ds='train'):
+    def calc_pheo_fitness(self, pheno, n_sample=5000, device=None, ds='train'):
         if ds=='train':
             X, Y = self.X_train, self.Y_train
         else:

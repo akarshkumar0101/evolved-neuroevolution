@@ -2,6 +2,8 @@ import numpy as np
 import torch
 from torch import nn
 
+from functools import partial
+
 def to_np_obj_array(a):
     """
     Takes in a list/iterable of stuff and turns it into a numpy object array.
@@ -11,41 +13,36 @@ def to_np_obj_array(a):
         na[i] = item
     return na
 
-def perturb_type1(a, lr):
-    return a + lr*torch.randn_like(a)
+def uniform_crossover(a, b, p=.5):
+    c = a.clone()
+    mask = torch.rand_like(a)<p
+    c[mask] = b[mask]
+    return c
 
-def perturb_type2(a, prob, rgn=torch.randn):
+def partial_additive_corrupting_noise(a, p, eps, add=True, rgn=torch.randn_like):
     a = a.clone()
-    mask = torch.rand_like(a)<prob
-#     a[mask] = 1e-1*torch.randn_like(a)[mask]
-    a[mask] = 1e-1*rgn(mask.sum()).to(a)
-    return a
-
-def perturb_type3(a, prob, rgn=torch.randn):
-    a = a.clone()
-    mask = torch.rand_like(a)<prob
-#     a[mask] = 1e-1*torch.randn_like(a)[mask]
-    a[mask] = ~a[mask]
-    return a
-
-def perturb_vec(a, prob, eps, add, rgn=torch.randn):
-    a = a.clone()
-    mask = torch.rand_like(a)<prob
-    noise = eps*rgn(mask.sum(), dtype=a.dtype, device=a.device)
+    mask = torch.rand_like(a)<p
+    noise = eps*rgn(a[mask])
     if add:
         a[mask] = a[mask] + noise
     else:
         a[mask] = noise
     return a
 
-def perturb_bool(a, prob):
+partial_corrupting_noise = partial(partial_additive_corrupting_noise, add=False)
+partial_additive_noise = partial(partial_additive_corrupting_noise, add=True)
+additive_noise = partial(partial_additive_corrupting_noise, p=1, add=True)
+
+def mask_inverse_noise(a, p, rgn=torch.randn):
     a = a.clone()
-    mask = torch.rand(a.shape, device=a.device, dtype=torch.float32)<prob
+    mask = torch.rand_like(a)<p
     a[mask] = ~a[mask]
     return a
     
-
-def model2vec(model, device='cpu'):
+def count_params(model):
+    return np.sum([p.numel() for p in model.parameters()], dtype=int)
+    
+def model2vec(model):
     p = model.parameters()
     n_params = np.sum([pi.numel() for pi in p], dtype=int)
     if n_params==0:
