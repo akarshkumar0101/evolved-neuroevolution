@@ -2,19 +2,25 @@ import numpy as np
 import torch
 import torch.nn as nn
 
+import util
+
 class Breeder(nn.Module):
     def __init__(self, config=None):
         super().__init__()
 
-class FirstParentIdentityBreeder(Breeder):
+class NoBreeder(Breeder):
     def __init__(self, **kwargs):
         super().__init__()
     
-    def breed_dna(self, dna1, dna2):
+    def breed(self, dna1, dna2):
         return dna1
     
-    def load_breeder_dna(self, breeder_dna):
-        pass
+class UniformBreeder(Breeder):
+    def __init__(self, p=0.5, **kwargs):
+        super().__init__()
+        self.p = p
+    def breed(self, dna1, dna2):
+        return util.uniform_crossover(dna1, dna2, p=self.p)
 
 class LinearBreeder(Breeder):
     def __init__(self, **kwargs):
@@ -75,21 +81,6 @@ class AverageBreeder(Breeder):
 
     def breed_dna(self, dna1, dna2):
         return self(torch.stack([dna1, dna2], dim=-1))
-    
-class UniformBreeder(Breeder):
-    def __init__(self, **kwargs):
-        super().__init__()
-        if 'breeder_swap_prob' in kwargs:
-            self.p = kwargs['breeder_swap_prob']
-        else:
-            self.p = 0.5
-        
-    def breed_dna(self, dna1, dna2):
-        dna = dna1.clone()
-        mask = torch.rand_like(dna)<self.p
-        dna[mask] = dna2[mask]
-        return dna
-    
     
 class ElementwiseLinearBreeder(Breeder):
     def __init__(self, **kwargs):
@@ -160,34 +151,25 @@ class ConvRSBProbBreeder(nn.Module):
         self.seq = nn.Sequential(*[
             nn.Conv1d(2, 4, 5, padding=2),
             nn.ReLU(),
-#             nn.MaxPool1d(2),
             nn.Conv1d(4, 4, 5, padding=2),
             nn.ReLU(),
-#             nn.MaxPool1d(2),
-            nn.Conv1d(4, 4, 5, padding=2),
+            nn.Conv1d(4, 3, 5, padding=2),
             nn.ReLU(),
-#             nn.MaxPool1d(3),
-            nn.Conv1d(4, 1, 5, padding=2),
-#             nn.MaxPool1d(1),
+            nn.Conv1d(3, 1, 5, padding=2),
             nn.Sigmoid(),
         ])
-        if kwargs['breeder_init_zeros']:
-            for mod in self.modules():
-                if type(mod) is nn.Conv1d:
-                    mod.weight.data = torch.zeros_like(mod.weight)
-                    mod.bias.data = torch.zeros_like(mod.bias)
-        
-    def forward(self, x):
-        x = self.seq(x)[:, 0]
-        return x
+#         if kwargs['breeder_init_zeros']:
+#             for mod in self.modules():
+#                 if type(mod) is nn.Conv1d:
+#                     mod.weight.data = torch.zeros_like(mod.weight)
+#                     mod.bias.data = torch.zeros_like(mod.bias)
     
-    def breed_dna(self, dna1, dna2):
-        p = self(torch.stack([dna1, dna2], dim=-2)[None])[0]
-        dna = dna1.clone()
-        mask = torch.rand_like(p)<p
-        dna[mask] = dna2[mask]
-        
-        return dna
+    def breed(self, a, b):
+        return util.uniform_crossover(a,b, p=0.5)
+        p = self.seq(torch.stack([a, b], dim=0)[None])[0, 0]
+#         print(p.shape, p.mean().item(), p.std().item())
+#         return util.uniform_crossover(a, b, p=p)
+        return util.uniform_crossover(a, b)
     
 class ConvAdvancedRSBBreeder(nn.Module):
     def __init__(self, **kwargs):
@@ -225,3 +207,5 @@ class ConvAdvancedRSBBreeder(nn.Module):
         x = self(x[None])[0]
         
         return x
+
+
