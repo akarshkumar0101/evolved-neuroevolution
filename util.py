@@ -42,19 +42,29 @@ def mask_inverse_noise(a, p, rgn=torch.randn):
 def count_params(model):
     return np.sum([p.numel() for p in model.parameters()], dtype=int)
     
-def model2vec(model):
-    p = model.parameters()
-    n_params = np.sum([pi.numel() for pi in p], dtype=int)
-    if n_params==0:
-        return torch.tensor([])
-    return nn.utils.parameters_to_vector(model.parameters())
+def model2vec(model, use_torch_impl=True):
+    if use_torch_impl:
+        p = model.parameters()
+        n_params = np.sum([pi.numel() for pi in p], dtype=int)
+        if n_params==0:
+            return torch.tensor([])
+        return nn.utils.parameters_to_vector(model.parameters())
+    else:
+        return torch.cat([p.flatten() for p in model.parameters()])
 
-def vec2model(v, model):
-    p = model.parameters()
-    n_params = np.sum([pi.numel() for pi in p], dtype=int)
+def vec2model(v, model, use_torch_impl=True):
+    n_params = count_params(model)
     if len(v)!=n_params:
         raise Exception('Not correct number of parameters')
-    nn.utils.vector_to_parameters(v, model.parameters())
+        
+    if use_torch_impl:
+        nn.utils.vector_to_parameters(v, model.parameters())
+    else:
+        i = 0
+        for p in model.parameters():
+            l = p.numel()
+            p.data = v[i:i+l].reshape(p.shape)
+            i = i+l
     return model
 
 def dict_list2list_dict(DL):

@@ -14,7 +14,7 @@ class Genotype():
             if genos_parent is not None:
                 self.parents_id = [geno.id for geno in genos_parent]
             else:
-                self.parents_id =[]
+                self.parents_id = []
             self.origin_type = origin_type
     
     def empty_copy(self):
@@ -231,8 +231,17 @@ class Genotype():
         self.bwl = len(self.breeder_weights)
         self.mwl = len(self.mutator_weights)
     
-    def generate_random():
-        self.pheno_weights = self.pheno_weights
+    def generate_random(pheno_class, pheno,
+                        breeder_class, breeder,
+                        mutator_class, mutator, device):
+        pw = util.model2vec(pheno_class()).detach().to(device)
+        bw = util.model2vec(breeder_class()).detach().to(device)
+        mw = util.model2vec(mutator_class()).detach().to(device)
+        child = Genotype(pheno_weights=pw, breeder_weights=bw, mutator_weights=mw, 
+                         pheno_class=pheno_class,
+                         breeder_class=breeder_class, mutator_class=mutator_class,
+                         pheno=pheno, breeder=breeder, mutator=mutator)
+        return child
         
 #     def concat_all_weights(self):
 #         return torch.concat([self.pheno_weights, self.breeder_weights, self.mutator_weights])
@@ -244,30 +253,52 @@ class Genotype():
     def crossover(self, another):
         breeder = util.vec2model(self.breeder_weights, self.breeder)
         
-        all_weights = self.concat_all_weights()
-        another_all_weights = another.concat_all_weights()
-        
-        child_all_weights = breeder.breed(all_weights, another_all_weights)
-        pw, bw, mw = self.deconcat_all_weights(child_all_weights)
+        pw = breeder.breed(self.pheno_weights, another.pheno_weights)
+        bw = util.uniform_crossover(self.breeder_weights, another.breeder_weights)
+        mw = util.uniform_crossover(self.mutator_weights, another.mutator_weights)
         
         child = Genotype(pheno_weights=pw, breeder_weights=bw, mutator_weights=mw, 
                          pheno_class=self.pheno_class,
                          breeder_class=self.breeder_class, mutator_class=self.mutator_class,
                          pheno=self.pheno, breeder=self.breeder, mutator=self.mutator)
+        return child
     
     def mutate(self):
         mutator = util.vec2model(self.mutator_weights, self.mutator)
-        child_weights = mutator.mutate(self.pheno_weights)
-        
-        all_weights = self.concat_all_weights()
-        another_all_weights = another.concat_all_weights()
-        
-        child_all_weights = breeder.breed(all_weights, another_all_weights)
-        pw, bw, mw = self.deconcat_all_weights(child_all_weights)
+        pw = mutator.mutate(self.pheno_weights)
+        bw = util.additive_noise(self.breeder_weights, eps=1e-3)
+        mw = util.additive_noise(self.mutator_weights, eps=1e-3)
         
         child = Genotype(pheno_weights=pw, breeder_weights=bw, mutator_weights=mw, 
                          pheno_class=self.pheno_class,
                          breeder_class=self.breeder_class, mutator_class=self.mutator_class,
                          pheno=self.pheno, breeder=self.breeder, mutator=self.mutator)
+        return child
+    
+    def get_pheno(self):
+        return util.vec2model(self.pheno_weights, self.pheno)
         
-     
+# class Genotype():
+#     def __init__(self, pheno_weights, **kwargs):
+#         self.pheno_weights = pheno_weights
+        
+#         self.pheno_class = kwargs['pheno_class']
+#         self.pheno = kwargs['pheno']
+        
+#         self.pwl = len(self.pheno_weights)
+    
+#     def generate_random(pheno_class, pheno, device):
+#         pw = util.model2vec(pheno_class()).detach().to(device)
+#         return Genotype(pheno_weights=pw, pheno_class=pheno_class, pheno=pheno)
+        
+#     def crossover(self, another):
+#         pw = util.uniform_crossover(self.pheno_weights, another.pheno_weights)
+#         return Genotype(pheno_weights=pw, pheno_class=self.pheno_class, pheno=self.pheno)
+    
+#     def mutate(self):
+#         pw = util.additive_noise(self.pheno_weights, eps=1e-2)
+#         return Genotype(pheno_weights=pw, pheno_class=self.pheno_class, pheno=self.pheno)
+    
+#     def get_pheno(self):
+#         return util.vec2model(self.pheno_weights, self.pheno)
+        
