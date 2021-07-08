@@ -165,11 +165,10 @@ class ConvRSBProbBreeder(nn.Module):
 #                     mod.bias.data = torch.zeros_like(mod.bias)
     
     def breed(self, a, b):
-        return util.uniform_crossover(a,b, p=0.5)
         p = self.seq(torch.stack([a, b], dim=0)[None])[0, 0]
 #         print(p.shape, p.mean().item(), p.std().item())
 #         return util.uniform_crossover(a, b, p=p)
-        return util.uniform_crossover(a, b)
+        return util.uniform_crossover(a, b, p=p)
     
 class ConvAdvancedRSBBreeder(nn.Module):
     def __init__(self, **kwargs):

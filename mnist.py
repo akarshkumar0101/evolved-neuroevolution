@@ -33,7 +33,7 @@ class MNIST:
         self.X_test = torch.cat([di[0] for di in data], dim=0).to(device)
         self.Y_test = torch.cat([di[1] for di in data], dim=0).to(device)
 
-    def perform_stats(self, net, loader=None, show_stats=True, n_batches=-1, tqdm=tqdm, device='cpu'):
+    def perform_stats(self, net, loader=None, verbose=True, n_batches=-1, tqdm=tqdm, device='cpu'):
         if loader is None:
             loader = self.loader_test
         n_correct, total = 0, 0
@@ -54,7 +54,7 @@ class MNIST:
             total += len(Y_batch)
         loss_total /= n_examples
         accuracy = n_correct/total*100.
-        if show_stats:
+        if verbose:
             print(f'Average Loss: {loss_total:.03f}, Accuracy: {accuracy:.03f}%')
         return {'loss': loss_total, 'accuracy': accuracy}
 

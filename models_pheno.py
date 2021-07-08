@@ -1,6 +1,8 @@
 import torch
 import torch.nn as nn
 
+from einops.layers.torch import Rearrange
+
 class MassiveConvNet(nn.Module):
     def __init__(self, **kwargs):
         super().__init__()
@@ -65,3 +67,24 @@ class SmallNet(nn.Module):
         y = x
         x = self.fc1(x)
         return x.log_softmax(dim=-1)#, y, x
+
+class SmallNet(nn.Module):
+    def __init__(self, **kwargs):
+        super().__init__()
+        self.seq = nn.Sequential(
+            nn.Conv2d(1, 1, kernel_size=3),
+            nn.MaxPool2d(2),
+            nn.ReLU(),
+            nn.Conv2d(1, 1, kernel_size=3),
+            nn.MaxPool2d(2),
+            nn.ReLU(),
+            nn.Conv2d(1, 1, kernel_size=3),
+            nn.ReLU(),
+            Rearrange('b c y x -> b (c y x)'),
+            nn.Linear(9, 10),
+            nn.LogSoftmax(dim=-1),
+        )
+
+    def forward(self, x):
+        x = self.seq(x)
+        return x

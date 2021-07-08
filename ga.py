@@ -183,10 +183,10 @@ class SimpleGA:
         self.npop = Population(self.calc_npop(self.pop))
         self.gen_idx += 1
         
-    def run_evolution(self, n_gens, calc_fitdata_fn, tqdm=None, fn_callback=None):
+    def run_evolution(self, n_gens, calc_fitdata_fn, tqdm=None, leave=True, fn_callback=None):
         loop = range(n_gens)
         if tqdm is not None:
-            loop = tqdm(loop)
+            loop = tqdm(loop, leave=leave)
             
         for gen_idx in loop:
             fitdata = calc_fitdata_fn(self.ask())

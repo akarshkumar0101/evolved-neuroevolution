@@ -15,11 +15,15 @@ class AGMutator(nn.Module):
             self.eps = torch.full(size=shape, fill_value=eps)
 
         if adaptive_eps:
-            self.eps = nn.Parameter(self.eps)
+            self.eps = nn.Parameter(self.eps).requires_grad_(False)
+        self.delta = kwargs['delta']
 
     def mutate(self, a):
         # eps = (self.eps-self.ori_eps).abs()+self.ori_eps
-        eps = torch.clamp(self.eps, .5e-2, 2e-2)
+        # eps = torch.clamp(self.eps, .7e-2, 1.3e-2)
+        eps = torch.clamp(self.eps, self.ori_eps-self.delta, self.ori_eps+self.delta)
+        self.eps.data = eps
+
         # eps = torch.clamp(self.eps, min=self.ori_eps, max=None)
         return util.additive_noise(a, eps=eps)
 
