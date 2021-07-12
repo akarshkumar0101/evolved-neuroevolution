@@ -10,7 +10,7 @@ import shutil
 from functools import partial
 
 from torchinfo import summary
-import torch.utils.tensorboard as tb
+# import torch.utils.tensorboard as tb
 
 import models_pheno, models_decode, models_breed, models_mutate
 import mnist
