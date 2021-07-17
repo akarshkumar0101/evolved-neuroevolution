@@ -6,6 +6,7 @@ import torchvision
 from tqdm import tqdm
 
 from multi_arr import MultiArr
+import xarray as xr
 
 class MNIST:
     def __init__(self, ):
@@ -60,7 +61,7 @@ class MNIST:
 
     # TODO: do not use .item() anywhere and rather just accumulate gpu tensor data.
     # transferring from gpu mem to cpu mem takes FOREVER in clock time
-    def calc_pheo_fitness(self, pheno, n_samples=5000, device=None, ds='train'):
+    def calc_pheno_fitness(self, pheno, n_samples=5000, device=None, ds='train'):
         if ds=='train':
             X, Y = self.X_train, self.Y_train
         else:
@@ -80,7 +81,7 @@ class MNIST:
         accuracy = n_correct/len(Y_batch)*100.
         return {'fitness': -loss, 'loss': loss, 'accuracy': accuracy}
 
-    def calc_pop_fitness(self, pop, n_samples=5000, device=None, ds='train'):
+    def calc_pop_fitness(self, pop, geno2pheno, n_samples=5000, device=None, ds='train'):
         if ds=='train':
             X, Y = self.X_train, self.Y_train
         else:
@@ -93,14 +94,14 @@ class MNIST:
         
         X_batch, Y_batch = X[idx].to(device), Y[idx].to(device)
 
-        fds = []
-        for x in pop:
-            net = x.get_pheno().to(device)
+        fitdata = xr.DataArray(np.zeros((len(pop), 3)), dims=['pop', 'metric'], 
+                               coords={'metric':['loss', 'fitness', 'accuracy']})
+        for i, x in enumerate(pop):
+            net = geno2pheno(x).to(device)
             Y_batch_pred = net(X_batch)
             loss = self.loss_func(Y_batch_pred, Y_batch).item()
             n_correct = (Y_batch_pred.argmax(dim=-1)==Y_batch).sum().item()
             accuracy = n_correct/len(Y_batch)*100.
-            fitdata = {'fitness': -loss, 'loss': loss, 'accuracy': accuracy}
-            fds.append(fitdata)
-        return MultiArr.from_AD(np.array(fds))
+            fitdata[i, :] = [loss, -loss, accuracy]
+        return fitdata
     

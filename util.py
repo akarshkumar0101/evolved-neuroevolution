@@ -67,6 +67,13 @@ def vec2model(v, model, use_torch_impl=True):
             i = i+l
     return model
 
+def xr_to_dict_arr(a, dimname):
+    b = {}
+    for i, coord in enumerate(a.coords[dimname]):
+        coord = coord.item()
+        b[coord] = a.sel(**{dimname: coord})
+    return b
+
 def dict_list2list_dict(DL):
     return [dict(zip(DL,t)) for t in zip(*DL.values())]
 
