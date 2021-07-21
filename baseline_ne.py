@@ -40,6 +40,7 @@ def run_evolution(args):
         npop = [pop_selected[0]]
         for _ in range(args.n_pop-1):
             a, b = np.random.choice(len(pop_selected), size=(2), replace=False)
+#             c = pop_selected[a]
             c = util.uniform_crossover(pop_selected[a], pop_selected[b], p=0.5)
             c = util.additive_noise(c, eps=1e-2)
             npop.append(c.detach())

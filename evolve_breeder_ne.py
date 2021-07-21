@@ -22,7 +22,8 @@ def run_evolution(args):
     task.load_all_data(args.device)
 
     net = models_pheno.BigConvNet().to(args.device)
-    conet = models_breed.ConvRSBProbBreeder().to(args.device)
+#     conet = models_breed.ConvRSBProbBreeder().to(args.device)
+    conet = models_breed.ConvAdvancedRSBBreeder().to(args.device)
     triu_mask = torch.triu(torch.ones([args.n_pop]*2), diagonal=1).to(bool)
     pop = [(torch.randn(util.count_params(net)).to(args.device)/6.,
             torch.randn(util.count_params(conet)).to(args.device)/6.) for _ in range(args.n_pop)]

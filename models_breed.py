@@ -171,7 +171,7 @@ class ConvRSBProbBreeder(nn.Module):
         return util.uniform_crossover(a, b, p=p)
     
 class ConvAdvancedRSBBreeder(nn.Module):
-    def __init__(self, **kwargs):
+    def __init__(self, breeder_init_zeros=True, **kwargs):
         super().__init__()
 
         self.seq = nn.Sequential(*[
@@ -181,7 +181,7 @@ class ConvAdvancedRSBBreeder(nn.Module):
             nn.Conv1d(2, 1, 5, padding=2),
 #             nn.Tanh(),
         ])
-        if kwargs['breeder_init_zeros']:
+        if breeder_init_zeros:
             for mod in self.seq:
                 if type(mod) is nn.Conv1d:
                     mod.weight.data = torch.zeros_like(mod.weight)
@@ -197,7 +197,7 @@ class ConvAdvancedRSBBreeder(nn.Module):
 #         x = self.seq(x)
         return x[:, 0]
     
-    def breed_dna(self, dna1, dna2):
+    def breed(self, dna1, dna2):
         rsb_dna = dna1.clone()
         mask = (torch.rand_like(dna1)<.5)
         rsb_dna[mask] = dna2[mask]
