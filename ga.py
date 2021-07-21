@@ -121,6 +121,27 @@ def calc_npop_diversity(pop, cofitness, **kwargs):
     npop.extend(children)
     return util.to_np_obj_array(npop)
 
+def calc_npop_truncate(pop, fit, k, k_elite=1, cross_fn=None, mutate_fn=None, clone_fn=lambda x: x):
+    npop = []
+    idxs_sort = np.argsort(fit)[::-1]
+    idxs_elite = idxs_sort[:k_elite]
+    idxs_bum = idxs_sort[:k]
+    
+    pop_elite = [pop[i] for i in idxs_elite]
+    pop_bum = [pop[i] for i in idxs_bum]
+    npop.extend([clone_fn(geno) for geno in pop_elite])
+    
+    n_children = len(pop)-len(npop)
+    
+    parents1, parents2 = np.random.choice(pop_bum, size=(2, n_children))
+    if cross_fn is not None:
+        children = [cross_fn(p1, p2) for p1, p2 in zip(parents1, parents2)]
+    else:
+        children = parents1
+    children = [mutate_fn(geno) for geno in children]
+    npop.extend(children)
+    return util.to_np_obj_array(npop)
+
 class Population(list):
     def __init__(self, pop):
         self.extend(pop)

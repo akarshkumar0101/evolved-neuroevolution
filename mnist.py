@@ -10,8 +10,10 @@ import xarray as xr
 
 class MNIST:
     def __init__(self, ):
-        self.transform = torchvision.transforms.Compose([torchvision.transforms.ToTensor(),
-                                                    torchvision.transforms.Normalize((0.1307,), (0.3081,))])
+        self.transform = torchvision.transforms.Compose([
+            torchvision.transforms.ToTensor(),
+            torchvision.transforms.Normalize((0.1307,), (0.3081,))
+        ])
 
         self.ds_train = torchvision.datasets.MNIST('~/datasets/mnist', train=True, 
                                                    download=True, transform=self.transform)
@@ -23,7 +25,7 @@ class MNIST:
                                                         batch_size=self.bs_train, shuffle=True)
         self.loader_test = torch.utils.data.DataLoader(self.ds_test, 
                                                        batch_size=self.bs_test, shuffle=True)
-        self.loss_func = nn.NLLLoss()
+        self.loss_func = nn.CrossEntropyLoss()
 
     def load_all_data(self, device='cpu'):
         data = [(Xb, Yb) for Xb, Yb in self.loader_train]
