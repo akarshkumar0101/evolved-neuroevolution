@@ -135,11 +135,11 @@ def calc_npop_truncate(pop, fit, k, k_elite=1, cross_fn=None, mutate_fn=None, cl
     
     parents1, parents2 = np.random.choice(pop_bum, size=(2, n_children))
     if cross_fn is not None:
-        children = [cross_fn(p1, p2) for p1, p2 in zip(parents1, parents2)]
+        children_bef = [cross_fn(p1, p2) for p1, p2 in zip(parents1, parents2)]
     else:
-        children = parents1
-    children = [mutate_fn(geno) for geno in children]
-    npop.extend(children)
+        children_bef = parents1
+    children_aft = [mutate_fn(geno) for geno in children_bef]
+    npop.extend(children_aft)
     return util.to_np_obj_array(npop)
 
 class Population(list):
