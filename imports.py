@@ -27,6 +27,8 @@ import xarray as xr
 import argparse
 from ga import calc_npop_truncate
 import optim
+from viz import *
+from analysis import *
 
 def do_seed(seed):
     torch.manual_seed(seed)

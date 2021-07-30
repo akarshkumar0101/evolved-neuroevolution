@@ -1,9 +1,11 @@
 import numpy as np
+import torch
 import matplotlib.pyplot as plt
 
 import util
 from tqdm import tqdm
 import random
+
 
 def plot_fits_vs_gens(y, x=None, show_error=True, c=None, label=None):
     """
@@ -72,4 +74,5 @@ def viz_evolution_with_good_geno(gens, fitdata):
     plt.scatter(x.flatten(), y.flatten(), s=2, c='r')
     plt.errorbar(x=x.mean(axis=-1), y=y.mean(axis=-1), yerr=y.std(axis=-1), elinewidth=1)
     plt.ylim(-2.3, -.8)
+    
     
