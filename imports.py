@@ -21,6 +21,16 @@ import genotype
 import util, viz
 from multi_arr import MultiArr
 
-np.random.seed(0)
-torch.manual_seed(10);
+import functions
+from functions import *
+import xarray as xr
+import argparse
+from ga import calc_npop_truncate
+import optim
+
+def do_seed(seed):
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    
+do_seed(0)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
