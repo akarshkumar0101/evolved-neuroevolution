@@ -151,6 +151,50 @@ def run_evolution_mutpops_full(pop, optim_fn, n_gen, n_mutpop=10, mr=None, mr_mu
     fitmrs = torch.stack([d[3] for d in data])
     return pops, fits, mutpops, fitmrs
 
+def run_evolution_mutpops_full_only_elite(pop, optim_fn, n_gen, n_mutpop=10, 
+                                          mr=None, mr_mut=2., tqdm=None):
+    if mr is None:
+        mutpop = torch.logspace(-3, 3, n_mutpop, device=pop.device)[:, None]
+    else:
+        mutpop = torch.linspace(mr, mr, n_mutpop, device=pop.device)[:, None]
+        
+    mut_assignment = np.arange(len(pop)-1)//int(len(pop)/len(mutpop))
+    data = []
+    
+    fit = optim_fn(pop)
+    
+    loop = range(n_gen)
+    if tqdm is not None: loop = tqdm(loop)
+#     ffs = []
+    for i in loop:
+        pop = pop[fit.argmin()].repeat(len(pop), 1)
+        bpop = pop
+        bfit = fit
+        
+        mrs = mutpop[mut_assignment]
+        pop, idxs = calc_npop_truncate(pop, fit, mr=mrs)
+        fit = optim_fn(pop)
+        
+        fit_mrs = (fit[1:]-bfit[idxs]).reshape(len(mutpop), -1)
+        data.append((bpop, bfit, mutpop, fit_mrs))
+#         ffs.append(fit_mrs)
+        fit_mrs = fit_mrs.min(dim=-1).values
+        # This is estimating the min of the (noisy) distribution by taking two std below the mean.
+#         fit_mrs = fit_mrs.mean(dim=-1) - 2*fit_mrs.std(dim=-1)
+
+#         if i%20==0:
+#             fit_mrs = torch.cat(ffs, dim=-1)
+#             fit_mrs = fit_mrs.min(dim=-1).values
+        mutpop, _ = calc_npop_truncate(mutpop, fit_mrs, mr=mr_mut, mul_mr=True)
+#             ffs = []
+        
+        
+    pops = torch.stack([d[0] for d in data])
+    fits = torch.stack([d[1] for d in data])
+    mutpops = torch.stack([d[2] for d in data])
+    fitmrs = torch.stack([d[3] for d in data])
+    return pops, fits, mutpops, fitmrs
+
 def run_evolution_ns(pop, optim_fn, n_gen, mr=None, mr_mut=2., tqdm=None):
     if mr is None:
         mutpop = torch.logspace(-3, 3, len(pop), device=pop.device)[:, None]
