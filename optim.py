@@ -25,6 +25,7 @@ def calc_npop_truncate(pop, fit, k=.5, k_elite=None, mr=1e-2, mul_mr=False, idxs
     if mul_mr:
         eps = -1+2*torch.rand(n_children, pop.shape[-1], 
                               device=pop.device, dtype=pop.dtype)
+#         print(eps.shape, pop[idxs].mean(), mr, eps.mean())
         eps = mr**eps
         children = pop[idxs]*eps
     else:
@@ -129,6 +130,7 @@ def run_evolution_mutpops_full(pop, optim_fn, n_gen, n_mutpop=10, mr=None, mr_mu
         
         mrs = mutpop[mut_assignment]
         pop, idxs = calc_npop_truncate(pop, fit, mr=mrs)
+#         print(pop.mean(), idxs.shape, idxs.float().mean())
         fit = optim_fn(pop)
         
         fit_mrs = (fit[1:]-bfit[idxs]).reshape(len(mutpop), -1)
