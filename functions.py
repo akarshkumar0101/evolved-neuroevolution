@@ -12,6 +12,10 @@ def rastrigin(x):
     d = x.shape[-1]
     ans = (x.pow(2.)-10*torch.cos(2*np.pi*x)).sum(dim=-1)
     return 10*d + ans
+def myrastrigin(x):
+    d = x.shape[-1]
+    ans = (x.abs().pow(1.)-10*torch.cos(2*np.pi*x)).sum(dim=-1)
+    return 10*d + ans
 
 def schaffer(x):
     a0 = x.pow(2.).sum(dim=-1).sqrt().sin().pow(2.)
