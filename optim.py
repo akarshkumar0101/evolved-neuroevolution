@@ -2,221 +2,164 @@ import torch
 import numpy as np
 import cma
 
-def calc_npop_truncate(pop, fit, k=.5, k_elite=None, mr=1e-2, mul_mr=False, idxs=None):
-    k = int(len(pop)*k)
+def calc_npop_idxs(fit, k=.5, k_elite=None):
+    k = int(len(fit)*k)
     if k_elite is None:
         k_elite = 1
     else:
-        k_elite = int(len(pop)*k_elite)
-    
-    npop = torch.zeros_like(pop)
+        k_elite = int(len(fit)*k_elite)
     idxs_sort = torch.argsort(fit)
     idxs_elite = idxs_sort[:k_elite]
-    idxs_bum = idxs_sort[:k]
-    
-    npop[:k_elite] = pop[idxs_elite]
-    
-    n_children = len(pop)-k_elite
-    
-    if idxs is None:
-        idxs = np.random.choice(len(idxs_bum), size=(n_children, ), replace=True)
-        idxs = idxs_bum[idxs]
-        
-    if mul_mr:
-        eps = -1+2*torch.rand(n_children, pop.shape[-1], 
-                              device=pop.device, dtype=pop.dtype)
-#         print(eps.shape, pop[idxs].mean(), mr, eps.mean())
-        eps = mr**eps
-        children = pop[idxs]*eps
-    else:
-        children = pop[idxs]+mr*torch.randn_like(pop[idxs])
-    npop[k_elite:] = children
-    
-    return npop, idxs
+    idxs_rest = idxs_sort[:k]
+    n_children = len(fit)-k_elite
+    idxs_rest = idxs_rest[np.random.choice(len(idxs_rest), size=(n_children, ), replace=True)]
+    idxs_cat = torch.cat([idxs_elite, idxs_rest], dim=-1)
+    return idxs_elite, idxs_rest, idxs_cat
 
-def calc_npop_ns(pop, mutpop, fit, k=.5, k_elite=None, mr_mut=2.):
-    k = int(len(pop)*k)
-    if k_elite is None:
-        k_elite = 1
-    else:
-        k_elite = int(len(pop)*k_elite)
-    
+def calc_npop_gaussian(pop, mr, 
+                       idxs_elite, idxs_rest, idxs_cat=None):
     npop = torch.zeros_like(pop)
-    nmutpop = torch.zeros_like(mutpop)
-    
-    idxs_sort = torch.argsort(fit)
-    idxs_elite = idxs_sort[:k_elite]
-    idxs_bum = idxs_sort[:k]
-    
-    npop[:k_elite] = pop[idxs_elite]
-    nmutpop[:k_elite] = mutpop[idxs_elite]
-    
-    n_children = len(pop)-k_elite
-    
-    idxs = np.random.choice(len(idxs_bum), size=(n_children, ), replace=True)
-    idxs = idxs_bum[idxs]
-    
-    npop[k_elite:] = pop[idxs]+mutpop[idxs]*torch.randn_like(pop[idxs])
-    
-    eps = mr_mut**(-1+2*torch.rand_like(mutpop[idxs]))
-    nmutpop[k_elite:] = mutpop[idxs]*eps
-    return npop, nmutpop
+    npop[:len(idxs_elite)] = pop[idxs_elite]
+    p = pop[idxs_rest]
+    eps = torch.randn_like(p)
+    npop[len(idxs_elite):] = p+eps*mr
+    return npop
+
+def calc_npop_gaussian_mean_std(pop, mr_mean, mr_std, 
+                                idxs_elite, idxs_rest, idxs_cat=None):
+    npop = torch.zeros_like(pop)
+    npop[:len(idxs_elite)] = pop[idxs_elite]
+    p = pop[idxs_rest]
+    eps = torch.randn_like(p)
+    npop[len(idxs_elite):] = p+(eps*mr_std+mr_mean)
+    return npop
 
 
+def calc_npop_log_uniform(pop, mr, idxs_elite, idxs_rest, idxs_cat=None):
+    npop = torch.zeros_like(pop)
+    npop[:len(idxs_elite)] = pop[idxs_elite]
+    p = pop[idxs_rest]
+#     print(idxs_elite, idxs_rest)
+    eps = -1+2*torch.rand_like(p)
+#     print(eps.shape, p.mean(), mr, eps.mean())
+    npop[len(idxs_elite):] = p*(mr**eps)
+    return npop
 
-
-
-def run_evolution_base(pop, optim_fn, n_gen, mr, tqdm=None):
+def run_evolution_base(pop, optim_fn, n_gen, mr, 
+                       k=.5, k_elite=None,
+                       tqdm=lambda x: x):
     data = []
-    loop = range(n_gen)
-    if tqdm is not None: loop = tqdm(loop)
-    for i in loop:
+    fit = optim_fn(pop)
+    data.append((pop, fit))
+    for i in tqdm(range(n_gen)):
+        pop = calc_npop_gaussian(pop, mr, *calc_npop_idxs(fit, k=k, k_elite=k_elite))
         fit = optim_fn(pop)
         data.append((pop, fit))
-        pop, idxs = calc_npop_truncate(pop, fit, mr=mr)
-    
-    pops = torch.stack([d[0] for d in data])
-    fits = torch.stack([d[1] for d in data])
-    return pops, fits
+    # pops, fits
+    return [torch.stack([d[i] for d in data]) for i in range(len(data[0]))]
 
-def run_evolution_mutpops(pop, optim_fn, n_gen, n_mutpop=10, mr=None, mr_mut=2., tqdm=None):
-    if mr is None:
-        mutpop = torch.logspace(-3, 3, n_mutpop, device=pop.device)[:, None]
-    else:
-        mutpop = torch.linspace(mr, mr, n_mutpop, device=pop.device)[:, None]
-        
-    mut_assignment = np.arange(len(pop)-1)//int(len(pop)/len(mutpop))
-    data = []
-    loop = range(n_gen)
-    if tqdm is not None: loop = tqdm(loop)
-    for i in loop:
-        fit = optim_fn(pop)
-        
-        mrs = mutpop[mut_assignment]
-        fit_b = optim_fn(pop[1:])
-        fit_a = optim_fn(pop[1:]+mrs*torch.randn_like(pop[1:]))
-        fit_mrs = (fit_a-fit_b).reshape(len(mutpop), -1)
-        data.append((pop, fit, mutpop, fit_mrs))
-        
-#         fit_mrs = fit_mrs.min(dim=-1).values
-        fit_mrs = fit_mrs.sort(dim=-1).values[:, :1].mean(dim=-1)
-        mutpop, _ = calc_npop_truncate(mutpop, fit_mrs, mr=mr_mut, mul_mr=True)
-        pop, _ = calc_npop_truncate(pop, fit, mr=mrs)
-        
-    pops = torch.stack([d[0] for d in data])
-    fits = torch.stack([d[1] for d in data])
-    mutpops = torch.stack([d[2] for d in data])
-    fitmrs = torch.stack([d[3] for d in data])
-    return pops, fits, mutpops, fitmrs
-
-def run_evolution_mutpops_full(pop, optim_fn, n_gen, n_mutpop=10, mr=None, mr_mut=2., tqdm=None):
-    if mr is None:
-        mutpop = torch.logspace(-3, 3, n_mutpop, device=pop.device)[:, None]
-    else:
-        mutpop = torch.linspace(mr, mr, n_mutpop, device=pop.device)[:, None]
-        
-    mut_assignment = np.arange(len(pop)-1)//int(len(pop)/len(mutpop))
-    data = []
-    
-    fit = optim_fn(pop)
-    
-    loop = range(n_gen)
-    if tqdm is not None: loop = tqdm(loop)
-#     ffs = []
-    for i in loop:
-#         mutpop[-1,0] = 1e-1
-        bpop = pop
-        bfit = fit
-        
-        mrs = mutpop[mut_assignment]
-        pop, idxs = calc_npop_truncate(pop, fit, mr=mrs)
-#         print(pop.mean(), idxs.shape, idxs.float().mean())
-        fit = optim_fn(pop)
-        
-        fit_mrs = (fit[1:]-bfit[idxs]).reshape(len(mutpop), -1)
-        data.append((bpop, bfit, mutpop, fit_mrs))
-#         ffs.append(fit_mrs)
-        fit_mrs = fit_mrs.min(dim=-1).values
-        # This is estimating the min of the (noisy) distribution by taking two std below the mean.
-#         fit_mrs = fit_mrs.mean(dim=-1) - 2*fit_mrs.std(dim=-1)
-
-#         if i%20==0:
-#             fit_mrs = torch.cat(ffs, dim=-1)
-#             fit_mrs = fit_mrs.min(dim=-1).values
-        mutpop, _ = calc_npop_truncate(mutpop, fit_mrs, mr=mr_mut, mul_mr=True)
-#             ffs = []
-        
-        
-    pops = torch.stack([d[0] for d in data])
-    fits = torch.stack([d[1] for d in data])
-    mutpops = torch.stack([d[2] for d in data])
-    fitmrs = torch.stack([d[3] for d in data])
-    return pops, fits, mutpops, fitmrs
-
-def run_evolution_mutpops_full_only_elite(pop, optim_fn, n_gen, n_mutpop=10, 
-                                          mr=None, mr_mut=2., tqdm=None):
-    if mr is None:
-        mutpop = torch.logspace(-3, 3, n_mutpop, device=pop.device)[:, None]
-    else:
-        mutpop = torch.linspace(mr, mr, n_mutpop, device=pop.device)[:, None]
-        
-    mut_assignment = np.arange(len(pop)-1)//int(len(pop)/len(mutpop))
-    data = []
-    
-    fit = optim_fn(pop)
-    
-    loop = range(n_gen)
-    if tqdm is not None: loop = tqdm(loop)
-#     ffs = []
-    for i in loop:
-        pop = pop[fit.argmin()].repeat(len(pop), 1)
-        bpop = pop
-        bfit = fit
-        
-        mrs = mutpop[mut_assignment]
-        pop, idxs = calc_npop_truncate(pop, fit, mr=mrs)
-        fit = optim_fn(pop)
-        
-        fit_mrs = (fit[1:]-bfit[idxs]).reshape(len(mutpop), -1)
-        data.append((bpop, bfit, mutpop, fit_mrs))
-#         ffs.append(fit_mrs)
-        fit_mrs = fit_mrs.min(dim=-1).values
-        # This is estimating the min of the (noisy) distribution by taking two std below the mean.
-#         fit_mrs = fit_mrs.mean(dim=-1) - 2*fit_mrs.std(dim=-1)
-
-#         if i%20==0:
-#             fit_mrs = torch.cat(ffs, dim=-1)
-#             fit_mrs = fit_mrs.min(dim=-1).values
-        mutpop, _ = calc_npop_truncate(mutpop, fit_mrs, mr=mr_mut, mul_mr=True)
-#             ffs = []
-        
-        
-    pops = torch.stack([d[0] for d in data])
-    fits = torch.stack([d[1] for d in data])
-    mutpops = torch.stack([d[2] for d in data])
-    fitmrs = torch.stack([d[3] for d in data])
-    return pops, fits, mutpops, fitmrs
-
-def run_evolution_ns(pop, optim_fn, n_gen, mr=None, mr_mut=2., tqdm=None):
+def run_evolution_ns(pop, optim_fn, n_gen, mr=None, mr_mut=2., 
+                     k=.5, k_elite=None,
+                     tqdm=lambda x: x):
     if mr is None:
         mutpop = torch.logspace(-3, 3, len(pop), device=pop.device)[:, None]
     else:
         mutpop = torch.linspace(mr, mr, len(pop), device=pop.device)[:, None]
-    
+        
     data = []
-    loop = range(n_gen)
-    if tqdm is not None: loop = tqdm(loop)
-    for i in loop:
+    fit = optim_fn(pop)
+    data.append((pop, fit, mutpop))
+    for i in tqdm(range(n_gen)):
+        idxs_elite, idxs_rest, idxs_cat = calc_npop_idxs(fit, k=k, k_elite=k_elite)
+        pop = calc_npop_gaussian(pop, mutpop[idxs_rest], idxs_elite, idxs_rest, idxs_cat)
+        mutpop = calc_npop_log_uniform(mutpop, mr_mut, idxs_elite, idxs_rest, idxs_cat)
         fit = optim_fn(pop)
-        pop, mutpop = calc_npop_ns(pop, mutpop, fit, mr_mut=2.)
-#         pop, idxs = calc_npop_truncate(pop, fit, mr=mutpop)
-#         mutpop, idxs = calc_npop_truncate(mutpop, fit[1:], mr=mr_mut, mul_mr=True, idxs=idxs)
         data.append((pop, fit, mutpop))
         
-    pops = torch.stack([d[0] for d in data])
-    fits = torch.stack([d[1] for d in data])
-    mutpops = torch.stack([d[2] for d in data])
-    return pops, fits, mutpops
+    # pops, fits, mrs, fitmrs
+    return [torch.stack([d[i] for d in data]) for i in range(len(data[0]))]
+
+
+def run_evolution_ours(pop, optim_fn, n_gen, n_mutpop=10, mr=None, mr_mut=2., 
+                       k=.5, k_elite=None,
+                       tqdm=lambda x: x):
+    if mr is None:
+        mutpop = torch.logspace(-3, 3, n_mutpop, device=pop.device)[:, None]
+    else:
+        mutpop = torch.linspace(mr, mr, n_mutpop, device=pop.device)[:, None]
+        
+    data = []
+    mrpop2mr = np.arange(len(pop)-1)//int(len(pop)/len(mutpop))
+    fit = optim_fn(pop)
+    for i in tqdm(range(n_gen)):
+        bpop = pop
+        bfit = fit
+        
+        idxs_elite, idxs_rest, idxs_cat = calc_npop_idxs(fit, k=k, k_elite=k_elite)
+        pop = calc_npop_gaussian(pop, mutpop[mrpop2mr], idxs_elite, idxs_rest, idxs_cat)
+        fit = optim_fn(pop)
+        fit_mrs = (fit[1:]-bfit[idxs_rest]).reshape(len(mutpop), -1)
+        data.append((bpop, bfit, mutpop, fit_mrs))
+        fit_mrs_min = fit_mrs.min(dim=-1).values
+        mutpop = calc_npop_log_uniform(mutpop, mr_mut, *calc_npop_idxs(fit_mrs_min))
+    data.append((pop, fit, mutpop, fit_mrs))
+        
+    # pops, fits, mrs, fitmrs
+    return [torch.stack([d[i] for d in data]) for i in range(len(data[0]))]
+
+def calc_ofmr(pop, optim_fn, n_gen, mrs, n_sample=5,
+              k=.5, k_elite=None, tqdm=lambda x: x):
+    f = []
+    for mr in tqdm(mrs):
+        for i in range(n_sample):
+            pops, fits = run_evolution_base(pop, optim_fn, n_gen, mr=mr)
+            f.append(fits)
+    f = torch.stack(f).reshape(len(mrs), n_sample, n_gen+1, pop.shape[-2])
+    return mrs[f.min(dim=-1).values[..., -1].mean(dim=-1).argmin()], f
+
+def run_evolution_look_ahead(pop, optim_fn, n_gen, 
+                             mrs, look_ahead, every_k_gen, n_sims,
+                             k=.5, k_elite=None,
+                             tqdm=lambda x: x):
+    data = []
+    fit = optim_fn(pop)
+    
+    mr_best, _ = calc_ofmr(pop, optim_fn, look_ahead, mrs, n_sample=n_sims,
+                        k=k, k_elite=k_elite)
+    data.append((pop, fit, mr_best))
+    for i in tqdm(range(n_gen)):
+        if i%every_k_gen==0:
+            mr_best, _ = calc_ofmr(pop, optim_fn, look_ahead, mrs, n_sample=n_sims,
+                                k=k, k_elite=k_elite)
+            
+        pop = calc_npop_gaussian(pop, mr_best, *calc_npop_idxs(fit, k=k, k_elite=k_elite))
+        fit = optim_fn(pop)
+        data.append((pop, fit, mr_best))
+    # pops, fits
+    return [torch.stack([d[i] for d in data]) for i in range(len(data[0]))]
+def run_evolution_one_fifth(pop, optim_fn, n_gen, mr, mr_mut=1.01, thresh=1/5.,
+                            k=.5, k_elite=None,
+                            tqdm=lambda x: x):
+    data = []
+    fit = optim_fn(pop)
+    mr = torch.tensor(mr) if type(mr) is float else mr
+    data.append((pop, fit, mr))
+    for i in tqdm(range(n_gen)):
+        idxs_elite, idxs_rest, idxs_cat = calc_npop_idxs(fit, k=k, k_elite=k_elite)
+        npop = calc_npop_gaussian(pop, mr, idxs_elite, idxs_rest, idxs_cat)
+        nfit = optim_fn(npop)
+        
+        dfit = nfit[1:]-fit[idxs_rest]
+        if (dfit<0).sum()/len(dfit) > thresh:
+            mr = mr*mr_mut
+        else:
+            mr = mr/mr_mut
+        
+        pop = npop
+        fit = nfit
+        data.append((pop, fit, mr))
+    # pops, fits, mrs
+    return [torch.stack([d[i] for d in data]) for i in range(len(data[0]))]
 
 def run_evolution_cmaes(pop, optim_fn, n_gen, mr, tqdm=None):
     es = cma.CMAEvolutionStrategy(pop.mean(dim=-1).tolist(), mr)
@@ -233,4 +176,71 @@ def run_evolution_cmaes(pop, optim_fn, n_gen, mr, tqdm=None):
     pops = torch.stack([d[0] for d in data])
     fits = torch.stack([d[1] for d in data])
     return pops, fits
+    
+    
+class UCBController():
+    def __init__(self, arms, c=0.5):
+        self.arms = arms
+        self.rewards = [[] for _ in self.arms]
+        self.Ns = np.zeros(len(self.arms))
+        self.c = c
+        
+    def sample(self):
+        if (self.Ns==0).any():
+            i = (self.Ns==0).argmax()
+        else:
+            Qs = np.array([np.array(r)[-10:].mean() for r in self.rewards])
+
+            t = self.Ns.sum()
+
+            explore = np.sqrt(np.log(t)/self.Ns)
+            exploit = Qs
+
+            i = np.argmax(exploit+self.c*explore)
+        return i, self.arms[i]
+    
+    def report_reward(self, i, reward):
+        self.Ns[i] += 1
+        self.rewards[i].append(reward)
+    
+    
+def run_evolution_ucb(pop, optim_fn, n_gen, mrs, 
+                      k=.5, k_elite=None, 
+                      return_ucb=False, 
+                      tqdm=lambda x: x):
+    data = []
+    fit = optim_fn(pop)
+    mr = mrs[0]
+
+    ucb = UCBController(mrs)
+
+    data.append((pop, fit, mr))
+    for i in tqdm(range(n_gen)):
+        idxs_elite, idxs_rest, idxs_cat = calc_npop_idxs(fit, k=k, k_elite=k_elite)
+        npop = calc_npop_gaussian(pop, mr, idxs_elite, idxs_rest, idxs_cat)
+        nfit = optim_fn(npop)
+        
+        dfit = nfit[1:]-fit[idxs_rest]
+        
+        mri, mr = ucb.sample()
+        ucb.report_reward(mri, -dfit.min())
+        
+        pop = npop
+        fit = nfit
+        data.append((pop, fit, mr))
+    # pops, fits, mrs
+    res = [torch.stack([d[i] for d in data]) for i in range(len(data[0]))]
+    if return_ucb:
+        return res, ucb
+    else:
+        return res
+
+def run_evolution_ofmr(pop, optim_fn, n_gen, mrs, n_sample=1, 
+                       k=.5, k_elite=None,
+                       tqdm=lambda x: x):
+    ofmr, f = calc_ofmr(pop, optim_fn, n_gen, mrs, n_sample, k=k, k_elite=k_elite)
+    pops, fits_ofmr = run_evolution_base(pop, optim_fn, n_gen, mr=ofmr, 
+                                               k=k, k_elite=None,
+                                               tqdm=tqdm)
+    return pops, fits_ofmr, ofmr.repeat(n_gen+1)
     

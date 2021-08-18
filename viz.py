@@ -1,12 +1,56 @@
 import numpy as np
 import torch
 import matplotlib.pyplot as plt
+from matplotlib import colors
 
 import util
 from tqdm import tqdm
 import random
 
+def plot_mean_std(f, name, c, logscale=False, 
+                  render_mean=True, render_std=True, render_plots=True):
+    if logscale:
+        y = f.log().mean(dim=0).exp()
+        yerr = f.log().std(dim=0).exp()
+    else:
+        y = f.mean(dim=0)
+        yerr = f.std(dim=0)
+        
+#     plt.figure(figsize=(10, 5))
+    x = np.arange(len(y))
+    c = colors.hex2color(colors.cnames[c])
+    if render_mean:
+        plt.plot(x, y, color=c, label=name)
+    c = list(c)+[0.2]
+    if render_std:
+        if logscale:
+            plt.fill_between(x, y/yerr, y*yerr, color=c, label=name if not render_mean else None)
+        else:
+            plt.fill_between(x, y-yerr, y+yerr, color=c, label=name if not render_mean else None)
+    if render_plots:
+        for fi in f:
+            plt.plot(x, fi, c=c)
 
+    if logscale:
+        plt.yscale('log')
+    plt.legend()
+
+class MultiPlot():
+    def __init__(self):
+        self.data = {}
+    
+    def plot(self, f, name, c, logscale=False):
+        if name not in self.data.keys():
+            self.data[name] = {'data': [], 'color': None, logscale:False}
+        self.data[name]['data'].append(f)
+        self.data[name]['color'] = c
+        self.data[name]['logscale'] = logscale
+
+    def render(self):
+        for label, data in self.data.items():
+            plot_mean_std(torch.stack(data['data']), label, data['color'], data['logscale'])
+            
+        
 def plot_fits_vs_gens(y, x=None, show_error=True, c=None, label=None):
     """
     `y` should be of shape (time points, num samples)
