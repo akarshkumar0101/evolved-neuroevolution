@@ -82,7 +82,7 @@ def run_evolution_ns(pop, optim_fn, n_gen, mr=None, mr_mut=2.,
 
 def run_evolution_ours(pop, optim_fn, n_gen, n_mutpop=10, mr=None, mr_mut=2., 
                        k=.5, k_elite=None,
-                       tqdm=lambda x: x):
+                       tqdm=lambda x: x, k_mr=.5):
     if mr is None:
         mutpop = torch.logspace(-3, 3, n_mutpop, device=pop.device)[:, None]
     else:
@@ -101,7 +101,7 @@ def run_evolution_ours(pop, optim_fn, n_gen, n_mutpop=10, mr=None, mr_mut=2.,
         fit_mrs = (fit[1:]-bfit[idxs_rest]).reshape(len(mutpop), -1)
         data.append((bpop, bfit, mutpop, fit_mrs))
         fit_mrs_min = fit_mrs.min(dim=-1).values
-        mutpop = calc_npop_log_uniform(mutpop, mr_mut, *calc_npop_idxs(fit_mrs_min))
+        mutpop = calc_npop_log_uniform(mutpop, mr_mut, *calc_npop_idxs(fit_mrs_min, k=k_mr))
     data.append((pop, fit, mutpop, fit_mrs))
         
     # pops, fits, mrs, fitmrs
