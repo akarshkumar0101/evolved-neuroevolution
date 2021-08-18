@@ -56,10 +56,6 @@ def zakharov(x, n_terms=2):
     a1 = torch.stack(a1, dim=-1).sum(dim=-1)
     return a0 + a1
     
-    
-    
-    pass
-    
 
 def sphere(x):
     d = x.shape[-1]
