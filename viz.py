@@ -120,3 +120,12 @@ def viz_evolution_with_good_geno(gens, fitdata):
     plt.ylim(-2.3, -.8)
     
     
+def empty_ax(ax):
+    # ax.patch.set_visible(True)
+    ax.patch.set_alpha(0.0)
+    # ax.axis('off')
+    # ax.set_xticks([]); ax.set_yticks([])
+    ax.spines['top'].set_color('none'); ax.spines['bottom'].set_color('none')
+    ax.spines['left'].set_color('none'); ax.spines['right'].set_color('none')
+    # ax.tick_params(labelcolor='w', top=False, bottom=False, left=False, right=False)
+    ax.tick_params(labelcolor=[0.,0.,0.,0.], length=0)

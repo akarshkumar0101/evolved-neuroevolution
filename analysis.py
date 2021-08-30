@@ -7,10 +7,12 @@ import util
 from tqdm import tqdm
 import random
 
+from scipy.signal import argrelextrema
+
 def get_mrs_fitness(x, mrs, optim_fn, n_samples=None):
     for _ in range(x.ndim):
         mrs = mrs[..., None]
-    shape = list(x.shape)
+    shape = [len(mrs)]+list(x.shape)
     if n_samples is not None:
         shape = [n_samples] + shape
         mrs = mrs[..., None]
@@ -60,38 +62,55 @@ def draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=True, annotate=Tru
     plt.pcolormesh(a, b, ns.T/ns.sum(axis=-1), shading='auto', 
                    norm=LogNorm() if log_dist else None)
     
+    
     if annotate:
-        plt.axvline(c='y', label='$\delta f$ = zero')
+        plt.axvline(c='y', label='$\Delta=0$')
         # for i in range(1):
         #     plt.plot(fit_diff.sort(dim=-1).values[:, i], mrs, c='g', 
         #              label='best' if i==0 else None)
-        for i, ii in enumerate([10, 50, 500, 1000, 5000]):
-            plt.plot(fit_diff.sort(dim=-1).values[:, :ii].mean(dim=-1), mrs, c='c', 
-                     label='lower avg' if i==0 else None)
+        
+#         argmins = argrelextrema(fit_diff.min(dim=-1).values.numpy(), np.less)[0]
+#         if len(argmins)>0:
+#             mins = fit_diff.min(dim=-1).values[argmins]
+#             argmins = argmins[np.argsort(mins)]
+#             if type(argmins) is not np.ndarray:
+#                 argmins = [argmins]
+#             print(argmins[:5])
+#             for i in argmins[:5]:
+#                 plt.axhline(mrs[i], c='magenta', label='best $\sigma$s' if i==0 else None)
+#         for i, ii in enumerate([10, 50, 500, 1000, 5000]):
+#             plt.plot(fit_diff.sort(dim=-1).values[:, :ii].mean(dim=-1), mrs, c='c', 
+#                      label='lower avg' if i==0 else None)
+
 #         plt.plot(fit_diff.reshape(-1, 100, 100).min(dim=-1).values.mean(dim=-1), mrs, 
 #                  c='b', label='avg of mins')
-        for i in range(10):
-            plt.axhline(best_mrs[i], c='magenta', label='best MRs' if i==0 else None)
-        plt.plot(fit_diff.min(dim=-1).values, mrs, c='orangered', label='min of $\delta f$')
-        plt.plot(fit_diff.max(dim=-1).values, mrs, c='orangered', label='max of $\delta f$')
-        plt.plot(fit_diff.mean(dim=-1), mrs, c='r', label='mean of $\delta f$')
-        plt.legend()
+        plt.plot(fit_diff.min(dim=-1).values, mrs, c='r', label='min of $\Delta$s')
+        plt.plot(fit_diff.max(dim=-1).values, mrs, c='r', label='max of $\Delta$s')
+        plt.plot(fit_diff.mean(dim=-1), mrs, c='dodgerblue', label='mean of $\Delta$s')
+#         plt.plot(fit_diff.mean(dim=-1)-fit_diff.var(dim=-1), mrs, c='k', label='mean-var')
+#         plt.plot(fit_diff.mean(dim=-1)-fit_diff.std(dim=-1), mrs, c='gray', label='mean-std')
+        for i in range(4):
+            plt.axhline(best_mrs[i], c='magenta', label='best $\sigma$s' if i==0 else None)
+        plt.legend(fontsize=20, bbox_to_anchor=(1.2, .8), loc='upper left')
     plt.colorbar()
     plt.yscale('log')
     plt.xlim(fd_bins.min(), fd_bins.max())
     
-    plt.ylabel('Mutation Rate, $\mu$')
-    plt.xlabel('Delta (after-before) Fitness of Mutation, $\delta(x, \mu)$')
     
-def viz_mrs_performance(mrs, fd_bins, ns, fit_diff):
+def viz_mrs_performance(mrs, fd_bins, ns, fit_diff, b=False):
     fig, axs = plt.subplots(1, 3, figsize=(20,5))
     plt.sca(axs[0])
     draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=False, annotate=False)
-    plt.title('MR Distribution over Delta Fitness')
+    plt.title('Distribution', fontsize=20)
+    plt.ylabel('Mutation Rate, $\sigma$', fontsize=20)
     plt.sca(axs[1])
     draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=True, annotate=False)
-    plt.title('Log Distribution')
+    plt.title('Log Distribution', fontsize=20)
+    plt.xlabel('Function Value Change of Mutation, $\Delta(x, \mu)$', fontsize=20)
     plt.sca(axs[2])
     draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=True, annotate=True)
+    plt.title('Annotated Log Distribution', fontsize=20)
+    if b:
+        plt.tight_layout()
     return fig, axs
     
