@@ -133,3 +133,6 @@ MNIST/
 wandb/
 data/
 outcmaes/
+.pt
+.th
+.pth
