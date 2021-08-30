@@ -12,16 +12,29 @@ from scipy.signal import argrelextrema
 def get_mrs_fitness(x, mrs, optim_fn, n_samples=None):
     for _ in range(x.ndim):
         mrs = mrs[..., None]
-    shape = [len(mrs)]+list(x.shape)
+    shape = list(x.shape)
     if n_samples is not None:
         shape = [n_samples] + shape
         mrs = mrs[..., None]
-    x_aft = x+torch.randn(shape).to(x)*mrs
-    x_bef = x
-    fit_bef = optim_fn(x_bef)
-    fit_aft = optim_fn(x_aft)
-    fit_diff = fit_aft-fit_bef
-    return x_bef, x_aft, fit_diff
+    xmut = x+torch.randn(shape).to(x)*mrs
+    fit_diff = optim_fn(xmut) - optim_fn(x)
+    return x, xmut, fit_diff
+
+def get_optimal_mr_extreme(x, mrs, optim_fn, n_samples=None):
+    x, xmut, fit_diff = get_mrs_fitness(x, mrs, optim_fn, n_samples)
+    return mrs[fit_diff.min(dim=-1).values.argmin(dim=0)]
+
+def get_optimal_mr_look_ahead(x, mrs, optim_fn, n_gen=10, n_samples=1):
+    if x.ndim==2:
+        x = x[None]
+    f = []
+    for xi in x:
+        for mr in mrs:
+            for i in range(n_samples):
+                pops, fits = optim.run_evolution_base(xi, optim_fn, n_gen, mr=mr)
+                f.append(fits.min())
+    f = torch.stack(f).reshape(len(x), len(mrs), n_samples)
+    return mrs[f.mean(dim=-1).argmin(dim=-1)]
 
 def viz_mrs_fit_hists(mrs, x, xmut, fit_diff, axshape=None, 
                       draw_n_min=3, draw_mins_avg=[10, 50, 500, 1000]):
