@@ -1,4 +1,5 @@
 import numpy as np
+import scipy.stats
 import xarray as xr
 import torch
 from torch import nn
