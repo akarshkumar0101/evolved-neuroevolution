@@ -3,17 +3,18 @@ import optim
 
 from functools import partial
 
-algos = ['ofmr', 'lamr_100', '1cmr', '15mr', 'ucb_5', 'ucb_10', 'nsmr', 'gsmr']
 def subtract_list(a, b):
     return [i for i in a if i not in b]
+
+algos_all = ['ofmr', 'lamr_100', '1cmr', '15mr', 'ucb_5', 'ucb_10', 'nsmr', 'gsmr']
 algo_ours = 'gsmr'
 algos_oracle = ['ofmr', 'lamr_100']
-algos_normal = [a for a in algos if a not in algos_oracle]
-labels = ['*OFMR', '*LAMR-100', '1CMR', '15MR', 'UCB/5', 'UCB/10', 'NSMR', 'GSMR']
+algos_normal = [a for a in algos_all if a not in algos_oracle]
+labels = ['*OFMR', '*LAMR-100', '1CMR', '15MR', 'UCB/5', 'UCB/10', 'SAMR', 'GESMR']
 # colors = ['cornflowerblue', 'yellow', 'cyan', 'darkblue', 'purple', 'magenta', 'darkgreen', 'darkred']
 colors = ['orangered', 'red', 'cyan', 'darkblue', 'purple', 'magenta', 'darkgreen', 'black']
-algo2color = {algo: color for algo, color in zip(algos, colors)}
-algo2label = {algo: label for algo, label in zip(algos, labels)}
+algo2color = {algo: color for algo, color in zip(algos_all, colors)}
+algo2label = {algo: label for algo, label in zip(algos_all, labels)}
 
 log_mr_low, log_mr_high = -3, 0
 mrs_grid_5 = torch.logspace(log_mr_low, log_mr_high, 5)
@@ -45,4 +46,4 @@ re_gsmr = partial(optim.run_evolution_ours,
                   n_mutpop=10, mr=None, mr_mut=2.0)
 
 algo_fns = [re_ofmr, re_la_100, re_1c, re_15, re_ucb_5, re_ucb_10, re_nsmr, re_gsmr]
-algo2algo_fn = {algo: algo_fn for algo, algo_fn in zip(algos, algo_fns)}
+algo2algo_fn = {algo: algo_fn for algo, algo_fn in zip(algos_all, algo_fns)}
