@@ -69,15 +69,16 @@ def viz_mrs_fit_hists(mrs, x, xmut, fit_diff, axshape=None,
     return fig, axs
 
 
-def draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=True, annotate=True):
-    best_mrs = mrs[fit_diff.min(dim=-1).values.argsort()]
+def draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=True, annotate=True, top_legend=True):
+    best_mrs = mrs[fit_diff.min(dim=-1).values.mean(dim=-1).argsort()]
+    best_mrs_mean = mrs[fit_diff.mean(dim=-1).mean(dim=-1).argsort()]
     a, b = torch.meshgrid(torch.from_numpy(fd_bins).float(), mrs)
     plt.pcolormesh(a, b, ns.T/ns.sum(axis=-1), shading='auto', 
                    norm=LogNorm() if log_dist else None)
     
     
     if annotate:
-        plt.axvline(c='y', label='$\Delta=0$')
+        plt.axvline(c='y', label='$\Delta=0$', linewidth=5)
         # for i in range(1):
         #     plt.plot(fit_diff.sort(dim=-1).values[:, i], mrs, c='g', 
         #              label='best' if i==0 else None)
@@ -97,14 +98,19 @@ def draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=True, annotate=Tru
 
 #         plt.plot(fit_diff.reshape(-1, 100, 100).min(dim=-1).values.mean(dim=-1), mrs, 
 #                  c='b', label='avg of mins')
-        plt.plot(fit_diff.min(dim=-1).values, mrs, c='r', label='min of $\Delta$s')
-        plt.plot(fit_diff.max(dim=-1).values, mrs, c='r', label='max of $\Delta$s')
-        plt.plot(fit_diff.mean(dim=-1), mrs, c='dodgerblue', label='mean of $\Delta$s')
+        plt.plot(fit_diff.min(dim=-1).values.mean(dim=-1), mrs, c='r', label='min of $\Delta$s', linewidth=5)
+        plt.plot(fit_diff.max(dim=-1).values.mean(dim=-1), mrs, c='r', label='max of $\Delta$s', linewidth=5)
+        plt.plot(fit_diff.mean(dim=-1).mean(dim=-1), mrs, c='dodgerblue', label='mean of $\Delta$s', linewidth=5)
 #         plt.plot(fit_diff.mean(dim=-1)-fit_diff.var(dim=-1), mrs, c='k', label='mean-var')
 #         plt.plot(fit_diff.mean(dim=-1)-fit_diff.std(dim=-1), mrs, c='gray', label='mean-std')
-        for i in range(4):
-            plt.axhline(best_mrs[i], c='magenta', label='best $\sigma$s' if i==0 else None)
-        plt.legend(fontsize=20, bbox_to_anchor=(1.2, .8), loc='upper left')
+        for i in range(1):
+            plt.axhline(best_mrs[i], c='purple', label='$\sigma=\sigma^*_{min}$' if i==0 else None, linewidth=5)
+        for i in range(1):
+            plt.axhline(best_mrs_mean[i+2], c='olive', label='$\sigma=\sigma^*_{\mu}$' if i==0 else None, linewidth=5)
+        if top_legend:
+            plt.legend(fontsize=20, bbox_to_anchor=(0, 1.9), loc='upper left', ncol=3)
+        else:
+            plt.legend(fontsize=20, bbox_to_anchor=(1.2, .9), loc='upper left')
     plt.colorbar()
     plt.yscale('log')
     plt.xlim(fd_bins.min(), fd_bins.max())
@@ -115,11 +121,11 @@ def viz_mrs_performance(mrs, fd_bins, ns, fit_diff, b=False):
     plt.sca(axs[0])
     draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=False, annotate=False)
     plt.title('Distribution', fontsize=20)
-    plt.ylabel('Mutation Rate, $\sigma$', fontsize=20)
+    plt.ylabel('Mutation Rate, $\sigma$', fontsize=23)
     plt.sca(axs[1])
     draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=True, annotate=False)
     plt.title('Log Distribution', fontsize=20)
-    plt.xlabel('Function Value Change of Mutation, $\Delta(x, \mu)$', fontsize=20)
+    plt.xlabel('Function Value Change of Mutation, $\Delta(x, \sigma)$', fontsize=23)
     plt.sca(axs[2])
     draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=True, annotate=True)
     plt.title('Annotated Log Distribution', fontsize=20)

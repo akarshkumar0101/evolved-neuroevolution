@@ -8,13 +8,17 @@ from tqdm import tqdm
 import random
 
 def plot_mean_std(f, name, c, logscale=False, 
-                  render_mean=True, render_std=True, render_plots=True):
+                  render_mean=True, render_std=True, render_plots=True, use_std_error=False):
     if logscale:
         y = f.log().mean(dim=0).exp()
         yerr = f.log().std(dim=0).exp()
+        if use_std_error:
+            yerr = (yerr.log()/np.sqrt(len(f))).exp()
     else:
         y = f.mean(dim=0)
         yerr = f.std(dim=0)
+        if use_std_error:
+            yerr = yerr/np.sqrt(len(f))
         
 #     plt.figure(figsize=(10, 5))
     x = np.arange(len(y))
