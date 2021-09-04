@@ -28,9 +28,14 @@ re_la_10 = partial(optim.run_evolution_look_ahead,
 re_la_100 = partial(optim.run_evolution_look_ahead, 
                     mrs=mrs_grid_10, look_ahead=100, every_k_gen=100, n_sims=1)
 
-def re_1c(pop, optim_fn, n_gen, k=.5, k_elite=None):
+def re_fmr(pop, optim_fn, n_gen, k=.5, k_elite=None, tqdm=lambda x: x):
+    mr = torch.tensor(1e-2).to(pop)
+    a = optim.run_evolution_base(pop, optim_fn, n_gen, mr, k=k, k_elite=k_elite, tqdm=tqdm)
+    return list(a)+[mr.repeat(n_gen+1)]
+
+def re_1c(pop, optim_fn, n_gen, k=.5, k_elite=None, tqdm=lambda x: x):
     mr = torch.tensor(1./pop.shape[-1]).to(pop)
-    a = optim.run_evolution_base(pop, optim_fn, n_gen, mr, k=k, k_elite=k_elite)
+    a = optim.run_evolution_base(pop, optim_fn, n_gen, mr, k=k, k_elite=k_elite, tqdm=tqdm)
     return list(a)+[mr.repeat(n_gen+1)]
 
 re_15 = partial(optim.run_evolution_one_fifth, 
