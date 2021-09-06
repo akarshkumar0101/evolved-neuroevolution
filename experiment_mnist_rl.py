@@ -40,7 +40,6 @@ do_seed(0)
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
-
 from paper_meta import *
 import gym
 
@@ -73,16 +72,61 @@ class MNISTNet(nn.Module):
         x = torch.relu(self.fc1(x))
         x = self.fc2(x)
         return x
-mnistnet = MNISTNet()
-CartPoleNet = nn.Sequential(nn.Linear(4, 128), nn.ReLU(), 
-                            nn.Linear(128, 2), nn.Softmax(dim=-1))
+class RLNet(nn.Module):
+    def __init__(self, dim_in, dim_out, softmax=True):
+        super().__init__()
+        self.softmax = softmax
+        
+        self.lin1 = nn.Linear(dim_in, 128)
+        self.lin2 = nn.Linear(128, dim_out)
+        # use 2 hidden layers of 64 and tanh.
+        
+    def forward(self, x):
+        x = self.lin1(x)
+        x = torch.relu(x)
+        x = self.lin2(x)
+        if self.softmax:
+            x = x.softmax(dim=-1)
+        return x
 
-env2net = {'mnist': mnistnet, 'cartpole': CartPoleNet}
-net = env2net[args.env]
+def get_env_stats(env):
+    dim_in = env.observation_space.shape[0]
+    if env.action_space.dtype==int:
+        dim_out = env.action_space.n
+        softmax = True
+    else:
+        dim_out = env.action_space.shape[0]
+        softmax = False
+    return dim_in, dim_out, softmax
+
+
+rl = True
+if args.env=='mnist':
+    rl = False
+    task = mnist.MNIST()
+    task.load_all_data(device=device)
+elif args.env=='fmnist':
+    rl = False
+    task = mnist.MNIST(fashion=True)
+    task.load_all_data(device=device)
+elif args.env=='cartpole':
+    env = gym.make('CartPole-v0')
+elif args.env=='pendulum':
+    env = gym.make('Pendulum-v0')
+elif args.env=='mountain':
+    env = gym.make('MountainCar-v0')
+elif args.env=='acrobot':
+    env = gym.make('Acrobot-v1')
+    
+if rl:
+    stats = get_env_stats(env)
+    net = RLNet(*stats)
+else:
+    net = MNISTNet()
+    net = net.to(device)
+    
+    
 n_dim = util.count_params(net)
-net = net.to(device)
-
-
 def fit_mnist(pop):
     bs = pop.shape[:-1]
     pop = pop.reshape(-1, n_dim)
@@ -90,52 +134,57 @@ def fit_mnist(pop):
     fit = task.calc_pop_fitness(pop, geno2pheno=lambda x: util.vec2model(x, net), device=device)
     return torch.from_numpy(fit.sel(metric='loss').data).reshape(*bs)
 
-def fit_cartpole(x, n_sample=1):
-    x = x.to(args.device)
+def fit_rl(x, n_sample=1):
     bs = x.shape[:-1]
     x = x.reshape(-1, x.shape[-1])
-    
+
     rs = []
-    
+
     for xi in x:
         neti = util.vec2model(xi, net)
         for seed in range(n_sample):
-            r=0
-            env = gym.make("CartPole-v0")
+            r = 0
             obs = env.reset()
-            for _ in range(250):
-                inp = torch.from_numpy(obs).reshape(1, -1).float().to(args.device)
+            for _ in range(600):
+                inp = torch.from_numpy(obs).reshape(1, -1).float().to(x.device)
                 out = neti(inp).detach().cpu().numpy()[0]
-                action = np.random.choice(range(2), size=1, p=out).item()
+                if stats[2]:
+                    action = np.random.choice(len(out), size=1, p=out).item()
+                else:
+                    action = out
                 obs, reward, done, info = env.step(action)
                 r += reward
                 if(done):
                     break
             rs.append(r)
-    rs = torch.tensor(rs).reshape(*bs, n_sample).mean(dim=-1).to(x)
-    return -rs
+    fits = -torch.tensor(rs).reshape(*bs, n_sample).mean(dim=-1).to(x)
+    return fits
 
-if args.env=='mnist':
+
+if rl:
+    optim_fn = partial(fit_rl, n_sample=5)
+else:
     optim_fn = fit_mnist
-elif args.env=='cartpole':
-    optim_fn = partial(fit_cartpole, n_sample=5)
 
-print(algo2algo_fn['gsmr'])
 algo2algo_fn['gsmr'] = partial(algo2algo_fn['gsmr'], n_mutpop=10)
 
 algo2algo_fn['fmr'] = re_fmr
-print(algo2algo_fn['gsmr'])
 
-def run_experiment_mnist(seed, algo, n_gen):
+def run_experiment(seed, algo, n_gen):
     config = {'seed': seed, 'algo': algo, 'n_gen': n_gen}
     
     do_seed(seed)
     pop = torch.randn(101, n_dim)/10.
     a = algo2algo_fn[algo](pop, optim_fn, n_gen, tqdm=tqdm)
     pops, fits, mrs = a[:3]
+    fits = fits.min(dim=-1).values
+    while mrs.ndim>1:
+        mrs = mrs.log().mean(dim=-1).exp()
     
-    data = {'pops': pops, 'fits': fits, 'mrs': mrs}
-    torch.save(config, f'/work/08258/akumar01/maverick2/evolved-neuroevolution/data/{args.env}/config_{algo}_{seed}.pt')
-    torch.save(data, f'/work/08258/akumar01/maverick2/evolved-neuroevolution/data/{args.env}/data_{algo}_{seed}.pt')
+    data = {'bestpop': pops[-1, 0], 'fits': fits, 'mrs': mrs}
+    
+    folder = f'/work/08258/akumar01/maverick2/evolved-neuroevolution/data/{args.env}'
+    torch.save(config, f'{folder}/config_{algo}_{seed}.pt')
+    torch.save(data, f'{folder}/data_{algo}_{seed}.pt')
 
-run_experiment_mnist(args.seed, args.algo, args.n_gen)
+run_experiment(args.seed, args.algo, args.n_gen)

@@ -9,16 +9,21 @@ from multi_arr import MultiArr
 import xarray as xr
 
 class MNIST:
-    def __init__(self, ):
+    def __init__(self, fashion=False):
         self.transform = torchvision.transforms.Compose([
             torchvision.transforms.ToTensor(),
             torchvision.transforms.Normalize((0.1307,), (0.3081,))
         ])
 
-        self.ds_train = torchvision.datasets.MNIST('~/datasets/mnist', train=True, 
-                                                   download=True, transform=self.transform)
-        self.ds_test = torchvision.datasets.MNIST('~/datasets/mnist', train=False, 
-                                                  download=True, transform=self.transform)
+        if fashion:
+            root = '~/datasets/fmnist'
+            torchds = torchvision.datasets.FashionMNIST
+        else:
+            root = '~/datasets/mnist'
+            torchds = torchvision.datasets.MNIST
+        
+        self.ds_train = torchds(root, train=True, download=True, transform=self.transform)
+        self.ds_test = torchds(root, train=False, download=True, transform=self.transform)
         self.bs_train = 1000
         self.bs_test = 3000
         self.loader_train = torch.utils.data.DataLoader(self.ds_train, 

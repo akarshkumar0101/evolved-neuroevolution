@@ -16,6 +16,7 @@ def get_mrs_fitness(x, mrs, optim_fn, n_samples=None):
     if n_samples is not None:
         shape = [n_samples] + shape
         mrs = mrs[..., None]
+    shape = [len(mrs)]+shape # don't share noise over MRs
     xmut = x+torch.randn(shape).to(x)*mrs
     fit_diff = optim_fn(xmut) - optim_fn(x)
     return x, xmut, fit_diff
@@ -69,13 +70,12 @@ def viz_mrs_fit_hists(mrs, x, xmut, fit_diff, axshape=None,
     return fig, axs
 
 
-def draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=True, annotate=True, top_legend=True):
+def draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=True, annotate=True, top_legend=False, cbar=True):
     best_mrs = mrs[fit_diff.min(dim=-1).values.mean(dim=-1).argsort()]
     best_mrs_mean = mrs[fit_diff.mean(dim=-1).mean(dim=-1).argsort()]
     a, b = torch.meshgrid(torch.from_numpy(fd_bins).float(), mrs)
     plt.pcolormesh(a, b, ns.T/ns.sum(axis=-1), shading='auto', 
                    norm=LogNorm() if log_dist else None)
-    
     
     if annotate:
         plt.axvline(c='y', label='$\Delta=0$', linewidth=5)
@@ -110,25 +110,35 @@ def draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=True, annotate=Tru
         if top_legend:
             plt.legend(fontsize=20, bbox_to_anchor=(0, 1.9), loc='upper left', ncol=3)
         else:
-            plt.legend(fontsize=20, bbox_to_anchor=(1.2, .9), loc='upper left')
-    plt.colorbar()
+            plt.legend(fontsize=30, bbox_to_anchor=(1.37, 1.2), loc='upper left')
+        handles, labels = plt.gca().get_legend_handles_labels()
+        
+    plt.locator_params(axis='y', nbins=2); plt.locator_params(axis='x', nbins=2)
+    plt.xticks(fontsize=20); plt.yticks(fontsize=20)
+        
+    if cbar:
+        cbar = plt.colorbar()
+        cbar.ax.tick_params(labelsize=20)
     plt.yscale('log')
     plt.xlim(fd_bins.min(), fd_bins.max())
+    
+    if annotate:
+        return handles, labels
     
     
 def viz_mrs_performance(mrs, fd_bins, ns, fit_diff, b=False):
     fig, axs = plt.subplots(1, 3, figsize=(20,5))
     plt.sca(axs[0])
     draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=False, annotate=False)
-    plt.title('Distribution', fontsize=20)
-    plt.ylabel('Mutation Rate, $\sigma$', fontsize=23)
+    plt.title('Distribution', fontsize=30)
+    plt.ylabel('Mutation Rate, $\sigma$', fontsize=35)
     plt.sca(axs[1])
     draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=True, annotate=False)
-    plt.title('Log Distribution', fontsize=20)
-    plt.xlabel('Function Value Change of Mutation, $\Delta(x, \sigma)$', fontsize=23)
+    plt.title('Log Distribution', fontsize=30)
+    plt.xlabel('Function Value Change of Mutation, $\Delta(x, \sigma)$', fontsize=35)
     plt.sca(axs[2])
     draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=True, annotate=True)
-    plt.title('Annotated Log Distribution', fontsize=20)
+    plt.title('Annotated Log Distribution', fontsize=30)
     if b:
         plt.tight_layout()
     return fig, axs
