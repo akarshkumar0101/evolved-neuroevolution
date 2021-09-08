@@ -99,7 +99,7 @@ def draw_mrs_performance(mrs, fd_bins, ns, fit_diff, log_dist=True, annotate=Tru
 #         plt.plot(fit_diff.reshape(-1, 100, 100).min(dim=-1).values.mean(dim=-1), mrs, 
 #                  c='b', label='avg of mins')
         plt.plot(fit_diff.min(dim=-1).values.mean(dim=-1), mrs, c='r', label='min of $\Delta$s', linewidth=5)
-        plt.plot(fit_diff.max(dim=-1).values.mean(dim=-1), mrs, c='r', label='max of $\Delta$s', linewidth=5)
+#         plt.plot(fit_diff.max(dim=-1).values.mean(dim=-1), mrs, c='r', label='max of $\Delta$s', linewidth=5)
         plt.plot(fit_diff.mean(dim=-1).mean(dim=-1), mrs, c='dodgerblue', label='mean of $\Delta$s', linewidth=5)
 #         plt.plot(fit_diff.mean(dim=-1)-fit_diff.var(dim=-1), mrs, c='k', label='mean-var')
 #         plt.plot(fit_diff.mean(dim=-1)-fit_diff.std(dim=-1), mrs, c='gray', label='mean-std')

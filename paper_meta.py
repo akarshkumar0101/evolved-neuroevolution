@@ -7,6 +7,7 @@ from functions import *
 
 optim_fn2label = {
     ackley: 'Ackley',
+    griewank: 'Griewank',
     rastrigin: 'Rastrigin',
     rosenbrock: 'Rosenbrock',
     sphere: 'Sphere',
@@ -16,13 +17,13 @@ optim_fn2label = {
 def subtract_list(a, b):
     return [i for i in a if i not in b]
 
-algos_all = ['ofmr', 'lamr_100', '1cmr', '15mr', 'ucb_5', 'ucb_10', 'nsmr', 'gsmr', 'gsmr_avg', 'fmr']
+algos_all = ['ofmr', 'lamr_100', '1cmr', '15mr', 'ucb_5', 'ucb_10', 'nsmr', 'gsmr', 'gsmr_avg', 'fmr', 'gsmr_fix']
 algo_ours = 'gsmr'
 algos_oracle = ['ofmr', 'lamr_100']
 algos_normal = [a for a in algos_all if a not in algos_oracle]
-labels = ['$^\dagger$OFMR', '$^\dagger$LAMR-100', '1CMR', '15MR', 'UCB/5', 'UCB/10', 'SAMR', 'GESMR', 'GESMR-AVG', 'FMR']
+labels = ['$^\dagger$OFMR', '$^\dagger$LAMR-100', '1CMR', '15MR', 'UCB/5', 'UCB/10', 'SAMR', 'GESMR', 'GESMR-AVG', 'FMR', 'GESMR-FIX']
 # colors = ['cornflowerblue', 'yellow', 'cyan', 'darkblue', 'purple', 'magenta', 'darkgreen', 'darkred']
-colors = ['orangered', 'red', 'cyan', 'darkblue', 'purple', 'magenta', 'darkgreen', 'black', 'yellow', 'brown']
+colors = ['maroon', 'red', 'cyan', 'darkblue', 'purple', 'magenta', 'darkgreen', 'black', 'yellow', 'slategrey', 'olive']
 algo2color = {algo: color for algo, color in zip(algos_all, colors)}
 algo2label = {algo: label for algo, label in zip(algos_all, labels)}
 
@@ -61,6 +62,8 @@ re_gsmr = partial(optim.run_evolution_ours,
                   n_mutpop=10, mr=None, mr_mut=2.0)
 re_gsmr_avg = partial(optim.run_evolution_ours, 
                   n_mutpop=10, mr=None, mr_mut=2.0, useavg=True)
+re_gsmr_fix = partial(optim.run_evolution_ours, 
+                  n_mutpop=10, mr=None, mr_mut=2.0, fixedmrpop=True)
 
-algo_fns = [re_ofmr, re_la_100, re_1c, re_15, re_ucb_5, re_ucb_10, re_nsmr, re_gsmr, re_gsmr_avg, re_fmr]
+algo_fns = [re_ofmr, re_la_100, re_1c, re_15, re_ucb_5, re_ucb_10, re_nsmr, re_gsmr, re_gsmr_avg, re_fmr, re_gsmr_fix]
 algo2algo_fn = {algo: algo_fn for algo, algo_fn in zip(algos_all, algo_fns)}
