@@ -82,7 +82,8 @@ algo2algo_fn = {algo: algo_fn for algo, algo_fn in zip(algos, algo_fns)}
 
 
 optim_fns = [ackley, rastrigin, rosenbrock, sphere, lin_fn]
-n_dims = [2, 30, 100, 1000]
+# n_dims = [2, 30, 100, 1000]
+n_dims = [1000, 100, 30, 2]
 # init_pop_vars = [.1, 1, 5, 10]
 init_pop_vars = [1, 10]
 n_seed = 5
@@ -107,8 +108,9 @@ for optim_fn in optim_fns:
     for n_dim in n_dims:
         for init_pop_var in init_pop_vars:
             for seed in range(n_seed):
-                pop = torch.randn(n_pop, n_dim)*init_pop_var
                 for algo in algos:
+                    do_seed(seed)
+                    pop = torch.randn(n_pop, n_dim)*init_pop_var
                     res = algo2algo_fn[algo](pop, optim_fn, n_gen)
                     pops, fits, mrs = res[:3]
                     fits = fits.min(dim=-1).values
