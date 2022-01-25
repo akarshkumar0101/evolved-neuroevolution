@@ -51,6 +51,8 @@ def re_1c(pop, optim_fn, n_gen, k=.5, k_elite=None, tqdm=lambda x: x):
 
 re_15 = partial(optim.run_evolution_one_fifth, 
                 mr=1e-2, mr_mut=2.0, thresh=0.2)
+re_15 = partial(optim.run_evolution_one_fifth, 
+                mr=1e-2, mr_mut=1.01, thresh=0.2)
 
 re_ucb_5 = partial(optim.run_evolution_ucb, mrs=mrs_grid_5)
 re_ucb_10 = partial(optim.run_evolution_ucb, mrs=mrs_grid_10)
@@ -67,3 +69,5 @@ re_gsmr_fix = partial(optim.run_evolution_ours,
 
 algo_fns = [re_ofmr, re_la_100, re_1c, re_15, re_ucb_5, re_ucb_10, re_nsmr, re_gsmr, re_gsmr_avg, re_fmr, re_gsmr_fix]
 algo2algo_fn = {algo: algo_fn for algo, algo_fn in zip(algos_all, algo_fns)}
+
+re_cmaes = partial(optim.run_evolution_cmaes, mr=1e-2)

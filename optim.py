@@ -165,7 +165,9 @@ def run_evolution_one_fifth(pop, optim_fn, n_gen, mr, mr_mut=1.01, thresh=1/5.,
     # pops, fits, mrs
     return [torch.stack([d[i] for d in data]) for i in range(len(data[0]))]
 
-def run_evolution_cmaes(pop, optim_fn, n_gen, mr, tqdm=None):
+def run_evolution_cmaes(pop, optim_fn, n_gen, mr=None, tqdm=None, timeout=None):
+    if mr is None:
+        mr = pop.std().item()
     es = cma.CMAEvolutionStrategy(pop.mean(dim=-1).tolist(), mr)
     data = []
     loop = range(n_gen)
@@ -180,6 +182,26 @@ def run_evolution_cmaes(pop, optim_fn, n_gen, mr, tqdm=None):
     pops = torch.stack([d[0] for d in data])
     fits = torch.stack([d[1] for d in data])
     return pops, fits
+
+def run_evolution_cmaes(pop, optim_fn, n_gen, max_time=None, tqdm=lambda x: x):
+    data = []
+    es = cma.CMAEvolutionStrategy(pop[0].numpy(), 1e-1, {'popsize':len(pop)})
+    st = time.time()
+    i = 0
+    while True:
+        if (i>n_gen if n_gen is not None else time.time()-st>max_time):
+            break
+        i += 1
+        pop = es.ask()
+        pop = np.array(pop)
+        fit = optim_fn(torch.from_numpy(pop)).numpy()
+        es.tell(pop, fit)
+        
+        data.append((torch.from_numpy(pop), torch.from_numpy(fit)))
+        
+    # pops, fits
+    return [torch.stack([d[i] for d in data]) for i in range(len(data[0]))]
+
     
     
 class UCBController():
