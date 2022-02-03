@@ -84,7 +84,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 from paper_meta import *
 
 if __name__ == '__main__':
-    optim_fns = [ackley, rastrigin, rosenbrock, sphere, lin_fn]
+    # optim_fns = [ackley, rastrigin, rosenbrock, sphere, lin_fn, griewank]
     # n_dims = [2, 30, 100, 1000]
     n_dims = [1000, 100, 30, 2]
     # n_dims = [100]
@@ -134,4 +134,4 @@ if __name__ == '__main__':
                         a.sel(fits_mrs='mrs')[:] = mrs.detach().cpu().numpy()
                 
                         pbar.update(n=1); pbar.refresh()
-    torch.save(data, 'results/main_data.th')
+    torch.save(data, 'results/main_data_griewank.th')
